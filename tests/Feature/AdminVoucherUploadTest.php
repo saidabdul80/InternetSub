@@ -6,6 +6,7 @@ use App\Models\Voucher;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Http\UploadedFile;
+use Inertia\Testing\AssertableInertia as Assert;
 
 it('uploads vouchers from csv, json, and txt files', function (string $filename, string $contents) {
     $user = User::factory()->create();
@@ -37,8 +38,33 @@ it('uploads vouchers from csv, json, and txt files', function (string $filename,
         'vouchers.json',
         '[{"code":"0066983371","plan_type":1},{"code":"0308798903","plan_type":1}]',
     ],
+    'json-bom' => [
+        'vouchers.json',
+        "\xEF\xBB\xBF".'[{"code":"0066983371","plan_type":1},{"code":"0308798903","plan_type":1}]',
+    ],
     'txt' => [
         'vouchers.txt',
         "0066983371,1\n0308798903 1\n",
     ],
 ]);
+
+it('shows uploaded vouchers in the admin list', function () {
+    $user = User::factory()->create();
+    $plan = Plan::factory()->create([
+        'plan_type' => 1,
+        'amount' => 5000,
+        'currency' => 'NGN',
+    ]);
+
+    Voucher::factory()->create([
+        'plan_type' => $plan->plan_type,
+        'code' => '0066983371',
+        'status' => 'available',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('admin.vouchers.index'));
+
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('Admin/Vouchers/Index')
+        ->has('vouchers', 1));
+});

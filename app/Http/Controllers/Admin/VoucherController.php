@@ -45,16 +45,38 @@ class VoucherController extends Controller
                 'created_at' => $payment->created_at,
             ]);
 
+        $vouchers = Voucher::query()
+            ->with(['plan', 'payment'])
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->map(fn (Voucher $voucher) => [
+                'id' => $voucher->id,
+                'code' => $voucher->code,
+                'status' => $voucher->status,
+                'plan' => [
+                    'plan_type' => $voucher->plan?->plan_type,
+                    'name' => $voucher->plan?->name,
+                ],
+                'payment' => [
+                    'reference' => $voucher->payment?->reference,
+                    'status' => $voucher->payment?->status,
+                ],
+                'reserved_at' => $voucher->reserved_at,
+                'used_at' => $voucher->used_at,
+                'created_at' => $voucher->created_at,
+            ]);
+
         return Inertia::render('Admin/Vouchers/Index', [
             'plans' => $plans,
             'payments' => $payments,
+            'vouchers' => $vouchers,
         ]);
     }
 
     public function store(UploadVouchersRequest $request): RedirectResponse
     {
         $file = $request->file('file');
-
         if (! $file instanceof UploadedFile) {
             return back()->withErrors(['file' => 'Invalid file upload.']);
         }
@@ -104,7 +126,7 @@ class VoucherController extends Controller
 
         $inserted = 0;
         foreach (array_chunk(array_values($validRows), 1000) as $chunk) {
-            Voucher::query()->insert($chunk);
+            Voucher::insert($chunk);
             $inserted += count($chunk);
         }
 
@@ -122,20 +144,34 @@ class VoucherController extends Controller
     {
         $contents = (string) $file->get();
         $extension = Str::lower($file->getClientOriginalExtension());
+        $mimeType = Str::lower((string) $file->getClientMimeType());
 
-        return match ($extension) {
-            'json' => $this->parseJson($contents),
-            'csv' => $this->parseCsv($contents),
-            'txt' => $this->parseText($contents),
+        return match (true) {
+            $extension === 'json' || $mimeType === 'application/json' => $this->parseJson($contents),
+            $extension === 'csv' => $this->parseCsv($contents),
+            $extension === 'txt' => $this->parseText($contents),
             default => [],
         };
     }
 
     protected function parseJson(string $contents): array
     {
-        $data = json_decode($contents, true);
+        $contents = preg_replace('/^\xEF\xBB\xBF/', '', $contents);
+        $data = json_decode((string) $contents, true);
 
-        return is_array($data) ? $data : [];
+        if (! is_array($data)) {
+            return [];
+        }
+
+        if (array_key_exists('vouchers', $data) && is_array($data['vouchers'])) {
+            return $data['vouchers'];
+        }
+
+        if (array_key_exists('code', $data) && array_key_exists('plan_type', $data)) {
+            return [$data];
+        }
+
+        return $data;
     }
 
     protected function parseCsv(string $contents): array

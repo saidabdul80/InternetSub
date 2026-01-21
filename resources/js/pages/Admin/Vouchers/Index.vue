@@ -33,9 +33,27 @@ interface Payment {
     created_at: string;
 }
 
+interface Voucher {
+    id: number;
+    code: string;
+    status: string;
+    plan: {
+        plan_type: number | null;
+        name: string | null;
+    };
+    payment: {
+        reference: string | null;
+        status: string | null;
+    };
+    reserved_at: string | null;
+    used_at: string | null;
+    created_at: string;
+}
+
 const props = defineProps<{
     plans: Plan[];
     payments: Payment[];
+    vouchers: Voucher[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -210,6 +228,76 @@ const formatAmount = (amount: number, currency: string) => {
                                     colspan="6"
                                 >
                                     No payments yet.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="rounded-xl border border-sidebar-border/70 p-6">
+                <h2 class="text-lg font-semibold">Recent Vouchers</h2>
+                <div class="mt-4 overflow-x-auto">
+                    <table class="min-w-full text-left text-sm">
+                        <thead class="text-xs uppercase text-muted-foreground">
+                            <tr>
+                                <th class="px-3 py-2">Code</th>
+                                <th class="px-3 py-2">Plan</th>
+                                <th class="px-3 py-2">Status</th>
+                                <th class="px-3 py-2">Payment</th>
+                                <th class="px-3 py-2">Reserved</th>
+                                <th class="px-3 py-2">Used</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="voucher in props.vouchers"
+                                :key="voucher.id"
+                                class="border-t border-sidebar-border/70"
+                            >
+                                <td class="px-3 py-2">
+                                    {{ voucher.code }}
+                                </td>
+                                <td class="px-3 py-2">
+                                    <div class="text-sm">
+                                        {{ voucher.plan.name || 'Unknown' }}
+                                    </div>
+                                    <div
+                                        class="text-xs text-muted-foreground"
+                                    >
+                                        Plan {{ voucher.plan.plan_type ?? '-' }}
+                                    </div>
+                                </td>
+                                <td class="px-3 py-2">
+                                    {{ voucher.status }}
+                                </td>
+                                <td class="px-3 py-2">
+                                    <div class="text-sm">
+                                        {{
+                                            voucher.payment.reference ||
+                                            'Not assigned'
+                                        }}
+                                    </div>
+                                    <div
+                                        v-if="voucher.payment.status"
+                                        class="text-xs text-muted-foreground"
+                                    >
+                                        {{ voucher.payment.status }}
+                                    </div>
+                                </td>
+                                <td class="px-3 py-2">
+                                    {{ voucher.reserved_at || '-' }}
+                                </td>
+                                <td class="px-3 py-2">
+                                    {{ voucher.used_at || '-' }}
+                                </td>
+                            </tr>
+                            <tr v-if="props.vouchers.length === 0">
+                                <td
+                                    class="px-3 py-4 text-center text-sm text-muted-foreground"
+                                    colspan="6"
+                                >
+                                    No vouchers yet.
                                 </td>
                             </tr>
                         </tbody>

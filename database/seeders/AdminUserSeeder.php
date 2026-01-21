@@ -13,10 +13,10 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         User::query()->updateOrCreate(
-            ['email' => "admin@example.com"],
+            ['email' => 'admin@example.com'],
             [
-                'name' => "admin@example.com",
-                'password' => "password",
+                'name' => 'admin@example.com',
+                'password' => 'password',
                 'email_verified_at' => now(),
             ]
         );
