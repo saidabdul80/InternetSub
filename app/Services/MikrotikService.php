@@ -21,7 +21,13 @@ class MikrotikService
         string $comment
     ): void {
         $client = new Client($this->resolveConfig());
-
+        Log::info("Creating hotspot user {$username} on Mikrotik",
+    [
+        $username, 
+        $password, 
+        $profile, 
+        $comment,
+    ]);
         $query = (new Query('/ip/hotspot/user/add'))
             ->equal('name', $username)
             ->equal('password', $password)
