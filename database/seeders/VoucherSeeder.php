@@ -12,7 +12,7 @@ class VoucherSeeder extends Seeder
      */
     public function run(): void
     {
-        Voucher::factory()->count(5)->create(['plan_type' => 1]);
-        Voucher::factory()->count(5)->create(['plan_type' => 2]);
+        // Voucher::factory()->count(5)->create(['plan_type' => 1]);
+        // Voucher::factory()->count(5)->create(['plan_type' => 2]);
     }
 }
