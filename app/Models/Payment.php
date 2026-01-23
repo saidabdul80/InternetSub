@@ -20,6 +20,7 @@ class Payment extends Model
         'currency',
         'access_point',
         'callback_url',
+        'phone_number',
         'status',
         'paystack_reference',
         'paid_at',

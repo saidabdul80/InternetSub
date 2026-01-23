@@ -36,6 +36,7 @@ it('initializes a payment and returns a paystack authorization url', function ()
     $response = $this->postJson('/api/pay', [
         'plan_type' => $plan->plan_type,
         'url' => 'https://ap.test/login',
+        'phone_number' => '+2348012345678',
     ]);
 
     $response->assertSuccessful()
@@ -49,7 +50,8 @@ it('initializes a payment and returns a paystack authorization url', function ()
     expect($payment)->not->toBeNull()
         ->and($payment->plan_id)->toBe($plan->id)
         ->and($payment->status)->toBe('pending')
-        ->and($payment->paystack_reference)->toBe('ps_ref_123');
+        ->and($payment->paystack_reference)->toBe('ps_ref_123')
+        ->and($payment->phone_number)->toBe('+2348012345678');
 
     expect($voucher->status)->toBe('reserved')
         ->and($voucher->payment_id)->toBe($payment->id)
@@ -60,6 +62,10 @@ it('verifies paystack payment and redirects with a voucher code', function () {
     config([
         'services.paystack.secret_key' => 'test-secret',
         'services.paystack.default_email' => 'test@example.com',
+        'services.sms.base_url' => 'https://api.ebulksms.com/sendsms',
+        'services.sms.api_key' => 'sms-key',
+        'services.sms.email_address' => 'sms@example.com',
+        'services.sms.sender_name' => 'GoodNews',
     ]);
 
     $plan = Plan::factory()->create([
@@ -76,6 +82,7 @@ it('verifies paystack payment and redirects with a voucher code', function () {
         'currency' => $plan->currency,
         'access_point' => 'https://ap.test/login',
         'callback_url' => 'https://app.test/api/paystack/callback',
+        'phone_number' => '+2348012345678',
         'status' => 'pending',
     ]);
 
@@ -95,6 +102,7 @@ it('verifies paystack payment and redirects with a voucher code', function () {
                 'reference' => $payment->reference,
             ],
         ]),
+        'https://api.ebulksms.com/sendsms*' => Http::response('OK'),
     ]);
 
     $response = $this->get('/api/paystack/callback?reference='.$payment->reference);
@@ -107,6 +115,12 @@ it('verifies paystack payment and redirects with a voucher code', function () {
     expect($payment->status)->toBe('fulfilled')
         ->and($voucher->status)->toBe('used')
         ->and($voucher->payment_id)->toBe($payment->id);
+
+    Http::assertSent(function ($request) use ($voucher): bool {
+        return str_contains($request->url(), 'api.ebulksms.com/sendsms')
+            && $request['recipients'] === '2348012345678'
+            && str_contains((string) $request['messagetext'], $voucher->code);
+    });
 });
 
 it('rejects payments when no vouchers are available', function () {
@@ -126,6 +140,7 @@ it('rejects payments when no vouchers are available', function () {
     $response = $this->postJson('/api/pay', [
         'plan_type' => $plan->plan_type,
         'url' => 'https://ap.test/login',
+        'phone_number' => '+2348012345678',
     ]);
 
     $response->assertStatus(409)
@@ -170,6 +185,7 @@ it('reuses an expired reservation when initializing payment', function () {
     $response = $this->postJson('/api/pay', [
         'plan_type' => $plan->plan_type,
         'url' => 'https://ap.test/login',
+        'phone_number' => '+2348012345678',
     ]);
 
     $response->assertSuccessful();
@@ -186,6 +202,10 @@ it('uses an available voucher when no reservation exists on successful payment',
     config([
         'services.paystack.secret_key' => 'test-secret',
         'services.paystack.default_email' => 'test@example.com',
+        'services.sms.base_url' => 'https://api.ebulksms.com/sendsms',
+        'services.sms.api_key' => 'sms-key',
+        'services.sms.email_address' => 'sms@example.com',
+        'services.sms.sender_name' => 'GoodNews',
     ]);
 
     $plan = Plan::factory()->create([
@@ -202,6 +222,7 @@ it('uses an available voucher when no reservation exists on successful payment',
         'currency' => $plan->currency,
         'access_point' => 'https://ap.test/login',
         'callback_url' => 'https://app.test/api/paystack/callback',
+        'phone_number' => '+2348012345678',
         'status' => 'pending',
     ]);
 
@@ -219,6 +240,7 @@ it('uses an available voucher when no reservation exists on successful payment',
                 'reference' => $payment->reference,
             ],
         ]),
+        'https://api.ebulksms.com/sendsms*' => Http::response('OK'),
     ]);
 
     $response = $this->get('/api/paystack/callback?reference='.$payment->reference);
@@ -231,4 +253,10 @@ it('uses an available voucher when no reservation exists on successful payment',
     expect($payment->status)->toBe('fulfilled')
         ->and($voucher->status)->toBe('used')
         ->and($voucher->payment_id)->toBe($payment->id);
+
+    Http::assertSent(function ($request) use ($voucher): bool {
+        return str_contains($request->url(), 'api.ebulksms.com/sendsms')
+            && $request['recipients'] === '2348012345678'
+            && str_contains((string) $request['messagetext'], $voucher->code);
+    });
 });

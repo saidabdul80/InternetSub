@@ -10,7 +10,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 class PaystackCallbackController extends Controller
 {
@@ -114,6 +116,7 @@ class PaystackCallbackController extends Controller
         }
 
         $redirectUrl = $this->buildAccessPointUrl($payment->access_point, $voucher->code);
+        $this->sendVoucherSms($payment, $voucher);
 
         return redirect()->away($redirectUrl);
     }
@@ -123,5 +126,41 @@ class PaystackCallbackController extends Controller
         $separator = str_contains($accessPoint, '?') ? '&' : '?';
 
         return $accessPoint.$separator.'voucher='.urlencode($code);
+    }
+
+    protected function sendVoucherSms(Payment $payment, Voucher $voucher): void
+    {
+        $phoneNumber = (string) $payment->phone_number;
+        $recipient = preg_replace('/\D+/', '', $phoneNumber);
+
+        if ($recipient === '') {
+            return;
+        }
+
+        $config = config('services.sms');
+        $baseUrl = (string) data_get($config, 'base_url');
+        $username = (string) data_get($config, 'email_address');
+        $apiKey = (string) data_get($config, 'api_key');
+        $senderName = (string) data_get($config, 'sender_name');
+
+        if ($baseUrl === '' || $username === '' || $apiKey === '' || $senderName === '') {
+            return;
+        }
+
+        $messageText = sprintf('Your GoodNews Wi-Fi voucher code is %s.', $voucher->code);
+
+        try {
+            Http::get($baseUrl, [
+                'username' => $username,
+                'apikey' => $apiKey,
+                'sender' => $senderName,
+                'messagetext' => $messageText,
+                'flash' => 0,
+                'recipients' => $recipient,
+                'dndsender' => 1,
+            ]);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 }
