@@ -137,6 +137,11 @@ class PaystackCallbackController extends Controller
             return;
         }
 
+        if (! str_starts_with($recipient, '234')) {
+            $recipient = ltrim($recipient, '0');
+            $recipient = '234'.$recipient;
+        }
+
         $config = config('services.sms');
         $baseUrl = (string) data_get($config, 'base_url');
         $username = (string) data_get($config, 'email_address');
