@@ -40,5 +40,10 @@ return [
         'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
         'default_email' => env('PAYSTACK_DEFAULT_EMAIL', 'captive@example.com'),
     ],
-
+    'sms' => [
+        'base_url' => env('SMS_BASE_URL', 'https://api.ebulksms.com/sendsms'),
+        'api_key' => env('SMS_API_KEY', 'XXX'),
+        'email_address' => env('SMS_EMAIL_ADDRESS', 'XXX'),
+        'sender_name' => env('SMS_SENDER_NAME', 'XXX'),
+    ],
 ];

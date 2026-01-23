@@ -24,6 +24,7 @@ class PaymentController extends Controller
         $reference = Str::random(15);
         $callbackUrl = route('api.paystack.callback');
         $accessPoint = (string) $request->string('url');
+        $phoneNumber = $request->string('phone_number')->toString();
 
         $payment = null;
         $voucher = null;
@@ -39,6 +40,7 @@ class PaymentController extends Controller
                     'currency' => $plan->currency,
                     'access_point' => $accessPoint,
                     'callback_url' => $callbackUrl,
+                    'phone_number' => $phoneNumber,
                     'status' => 'pending',
                 ]);
 
@@ -84,6 +86,7 @@ class PaymentController extends Controller
                     'payment_id' => $payment->id,
                     'plan_type' => $plan->plan_type,
                     'access_point' => $accessPoint,
+                    'phone_number' => $phoneNumber,
                 ],
             ]);
         } catch (RuntimeException $exception) {
