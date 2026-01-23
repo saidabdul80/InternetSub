@@ -153,6 +153,15 @@ withDefaults(
                             </a>
                         </li>
                     </ul>
+                    <p class="mt-6 text-xs text-[#706f6c] dark:text-[#A1A09A]">
+                        Need help? Call
+                        <a
+                            href="tel:07035398873"
+                            class="ml-1 underline underline-offset-4"
+                        >
+                            07035398873
+                        </a>
+                    </p>
                 </div>
                 <div
                     class="relative -mb-px aspect-335/376 w-full shrink-0 overflow-hidden rounded-t-lg bg-[#fff2f2] lg:mb-0 lg:-ml-px lg:aspect-auto lg:w-[438px] lg:rounded-t-none lg:rounded-r-lg dark:bg-[#1D0002]"
