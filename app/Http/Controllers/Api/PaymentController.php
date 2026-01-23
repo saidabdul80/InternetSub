@@ -31,7 +31,7 @@ class PaymentController extends Controller
         $reservationWindow = Carbon::now()->subMinutes(15);
 
         try {
-            DB::transaction(function () use ($plan, $reference, $accessPoint, $callbackUrl, $reservationWindow, &$payment, &$voucher): void {
+            DB::transaction(function () use ($plan, $reference, $accessPoint, $callbackUrl, $phoneNumber, $reservationWindow, &$payment, &$voucher): void {
                 $payment = Payment::query()->create([
                     'plan_id' => $plan->id,
                     'plan_type' => $plan->plan_type,
