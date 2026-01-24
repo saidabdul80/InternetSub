@@ -11,6 +11,7 @@ use App\Services\PaystackClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -29,15 +30,17 @@ class PaymentController extends Controller
         $payment = null;
         $voucher = null;
         $reservationWindow = Carbon::now()->subMinutes(15);
-        $last3PendingPayments = Payment::query()
-            ->where('phone_number', $phoneNumber)
+        $last3PendingPayments = Payment::where('phone_number', $phoneNumber)
             ->latest()
             ->limit(3)
             ->get();
+        Log::info('Last 3 pending payments: '.json_encode($last3PendingPayments));
         // check if any of the last 3 pending payments that is either paid or fulfilled using filter
         $isCompletePayments = $last3PendingPayments->filter(function ($payment) {
             return in_array($payment->status, ['paid', 'fulfilled']);
         });
+        Log::info('isCompletePayments: '.json_encode($isCompletePayments));
+
 
         $foundUnfulfilledPayment = null;
         if ($isCompletePayments->count() == 0) {
@@ -59,7 +62,7 @@ class PaymentController extends Controller
             }
 
         }
-
+        Log::info('foundUnfulfilledPayment: '.json_encode($foundUnfulfilledPayment));
         if ($foundUnfulfilledPayment) {
             $foundUnfulfilledPayment->update([
                 'access_point' => $accessPoint,
