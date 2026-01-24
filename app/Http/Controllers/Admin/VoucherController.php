@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Voucher;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -16,14 +17,29 @@ use Inertia\Response;
 
 class VoucherController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $filters = $request->only(['phone_number', 'status', 'date_from', 'date_to']);
         $plans = Plan::query()
             ->orderBy('plan_type')
             ->get(['plan_type', 'name', 'amount', 'currency']);
 
-        $payments = Payment::query()
+        $paymentsQuery = Payment::query()
             ->with(['plan', 'voucher'])
+            ->when($filters['phone_number'] ?? null, function ($query, string $phoneNumber): void {
+                $query->where('phone_number', 'like', '%'.$phoneNumber.'%');
+            })
+            ->when($filters['status'] ?? null, function ($query, string $status): void {
+                $query->where('status', $status);
+            })
+            ->when($filters['date_from'] ?? null, function ($query, string $dateFrom): void {
+                $query->whereDate('created_at', '>=', $dateFrom);
+            })
+            ->when($filters['date_to'] ?? null, function ($query, string $dateTo): void {
+                $query->whereDate('created_at', '<=', $dateTo);
+            });
+
+        $payments = $paymentsQuery
             ->latest()
             ->limit(50)
             ->get()
@@ -31,6 +47,7 @@ class VoucherController extends Controller
                 'id' => $payment->id,
                 'reference' => $payment->reference,
                 'status' => $payment->status,
+                'phone_number' => $payment->phone_number,
                 'amount' => $payment->amount,
                 'currency' => $payment->currency,
                 'plan' => [
@@ -71,6 +88,7 @@ class VoucherController extends Controller
             'plans' => $plans,
             'payments' => $payments,
             'vouchers' => $vouchers,
+            'filters' => $filters,
         ]);
     }
 
