@@ -34,16 +34,16 @@ class PaymentController extends Controller
             ->latest()
             ->limit(3)
             ->get();
-        Log::info('Last 3 pending payments: '.json_encode($last3PendingPayments));
+       // Log::info('Last 3 pending payments: '.json_encode($last3PendingPayments));
         // check if any of the last 3 pending payments that is either paid or fulfilled using filter
-        $isCompletePayments = $last3PendingPayments->filter(function ($payment) {
-            return in_array($payment->status, ['paid', 'fulfilled']);
-        });
-        Log::info('isCompletePayments: '.json_encode($isCompletePayments));
+        // $isCompletePayments = $last3PendingPayments->filter(function ($payment) {
+        //     return in_array($payment->status, ['paid', 'fulfilled']);
+        // });
+        //Log::info('isCompletePayments: '.json_encode($isCompletePayments));
 
 
         $foundUnfulfilledPayment = null;
-        if ($isCompletePayments->count() == 0) {
+        //if ($isCompletePayments->count() == 0) {
             // let verify transactions
             foreach ($last3PendingPayments as $payment) {
                 $reference = $payment->paystack_reference ?? $payment->reference;
@@ -61,8 +61,8 @@ class PaymentController extends Controller
                 }
             }
 
-        }
-        Log::info('foundUnfulfilledPayment: '.json_encode($foundUnfulfilledPayment));
+        //}
+        //Log::info('foundUnfulfilledPayment: '.json_encode($foundUnfulfilledPayment));
         if ($foundUnfulfilledPayment) {
             $foundUnfulfilledPayment->update([
                 'access_point' => $accessPoint,
