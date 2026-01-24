@@ -71,8 +71,10 @@ class PaymentController extends Controller
             ]);
 
             $redirectUrl = $this->finalizeSuccessfulPayment($foundUnfulfilledPayment, $accessPoint);
-
-            return redirect()->away($redirectUrl);
+            return response()->json([
+                'redirect_url' => $redirectUrl,
+                'reference' => $foundUnfulfilledPayment->reference,
+            ]);
             ///$this->sendVoucherSms($payment, $voucher);
 
         }
