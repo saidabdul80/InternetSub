@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
+import { fulfill, reverify } from '@/actions/App/Http/Controllers/Admin/PaymentController';
 import { index as adminVouchersIndex, upload as adminVouchersUpload } from '@/routes/admin/vouchers';
 import { type BreadcrumbItem } from '@/types';
 
@@ -75,6 +76,8 @@ const form = useForm({
     file: null as File | null,
 });
 
+const actionForm = useForm({});
+
 const filterForm = useForm({
     phone_number: props.filters.phone_number ?? '',
     status: props.filters.status ?? '',
@@ -141,6 +144,20 @@ const clearFilters = () => {
     filterForm.get(adminVouchersIndex().url, {
         preserveScroll: true,
         replace: true,
+    });
+};
+
+const reverifyPayment = (paymentId: number) => {
+    actionForm.submit(reverify(paymentId), {
+        preserveScroll: true,
+        preserveState: true,
+    });
+};
+
+const fulfillPayment = (paymentId: number) => {
+    actionForm.submit(fulfill(paymentId), {
+        preserveScroll: true,
+        preserveState: true,
     });
 };
 </script>
@@ -412,6 +429,9 @@ const clearFilters = () => {
                                         <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                             Paid At
                                         </th>
+                                        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            Actions
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y">
@@ -469,9 +489,30 @@ const clearFilters = () => {
                                                 {{ payment.created_at }}
                                             </div>
                                         </td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex flex-wrap gap-2">
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    :disabled="actionForm.processing"
+                                                    @click="reverifyPayment(payment.id)"
+                                                >
+                                                    Reverify
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    :disabled="actionForm.processing"
+                                                    @click="fulfillPayment(payment.id)"
+                                                >
+                                                    Mark Fulfilled
+                                                </Button>
+                                            </div>
+                                        </td>
                                     </tr>
                                     <tr v-if="props.payments.length === 0">
-                                        <td colspan="6" class="px-6 py-12 text-center">
+                                        <td colspan="7" class="px-6 py-12 text-center">
                                             <div class="space-y-2">
                                                 <div class="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
                                                     <svg class="h-6 w-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">

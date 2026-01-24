@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\VoucherController;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +24,10 @@ Route::middleware('auth')
     ->group(function () {
         Route::get('vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
         Route::post('vouchers/upload', [VoucherController::class, 'store'])->name('vouchers.upload');
+        Route::post('payments/{payment}/reverify', [PaymentController::class, 'reverify'])
+            ->name('payments.reverify');
+        Route::post('payments/{payment}/fulfill', [PaymentController::class, 'fulfill'])
+            ->name('payments.fulfill');
     });
 
 Route::get('send/sms', function () {
