@@ -260,3 +260,64 @@ it('uses an available voucher when no reservation exists on successful payment',
             && str_contains((string) $request['messagetext'], $voucher->code);
     });
 });
+
+it('reuses a successful paystack payment for the same phone number', function () {
+    config([
+        'services.paystack.secret_key' => 'test-secret',
+        'services.paystack.default_email' => 'test@example.com',
+    ]);
+
+    $plan = Plan::factory()->create([
+        'plan_type' => 1,
+        'amount' => 5000,
+        'currency' => 'NGN',
+    ]);
+
+    $payment = Payment::query()->create([
+        'plan_id' => $plan->id,
+        'plan_type' => $plan->plan_type,
+        'reference' => 'local_ref_789',
+        'amount' => $plan->amount,
+        'currency' => $plan->currency,
+        'access_point' => 'https://ap.test/login',
+        'callback_url' => 'https://app.test/api/paystack/callback',
+        'phone_number' => '+2348012345678',
+        'status' => 'pending',
+    ]);
+
+    $voucher = Voucher::factory()->create([
+        'plan_type' => $plan->plan_type,
+        'code' => '0011223344',
+        'status' => 'reserved',
+        'payment_id' => $payment->id,
+        'reserved_at' => now(),
+    ]);
+
+    Http::fake([
+        '*transaction/verify/*' => Http::response([
+            'status' => true,
+            'data' => [
+                'status' => 'success',
+                'reference' => $payment->reference,
+            ],
+        ]),
+    ]);
+
+    $response = $this->postJson('/api/pay', [
+        'plan_type' => $plan->plan_type,
+        'url' => 'https://ap.test/login',
+        'phone_number' => '+2348012345678',
+    ]);
+
+    $response->assertSuccessful()
+        ->assertJson([
+            'authorization_url' => 'https://ap.test/login?voucher='.$voucher->code,
+        ]);
+
+    $payment->refresh();
+    $voucher->refresh();
+
+    expect($payment->status)->toBe('fulfilled')
+        ->and($voucher->status)->toBe('used');
+    expect(Payment::query()->count())->toBe(1);
+});

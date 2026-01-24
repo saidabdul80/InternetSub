@@ -16,7 +16,7 @@ use RuntimeException;
 
 class PaymentController extends Controller
 {
-    public function store(CreatePaymentRequest $request, PaystackClient $paystackClient): JsonResponse
+    public function store(CreatePaymentRequest $request, PaystackClient $paystackClient)
     {
         $planType = $request->integer('plan_type');
         $plan = Plan::query()->where('plan_type', $planType)->firstOrFail();
@@ -29,6 +29,50 @@ class PaymentController extends Controller
         $payment = null;
         $voucher = null;
         $reservationWindow = Carbon::now()->subMinutes(15);
+        $last3PendingPayments = Payment::query()
+            ->where('phone_number', $phoneNumber)
+            ->latest()
+            ->limit(3)
+            ->get();
+        // check if any of the last 3 pending payments that is either paid or fulfilled using filter
+        $isCompletePayments = $last3PendingPayments->filter(function ($payment) {
+            return in_array($payment->status, ['paid', 'fulfilled']);
+        });
+
+        $foundUnfulfilledPayment = null;
+        if ($isCompletePayments->count() == 0) {
+            // let verify transactions
+            foreach ($last3PendingPayments as $payment) {
+                $reference = $payment->paystack_reference ?? $payment->reference;
+                try {
+                    $verification = $paystackClient->verifyTransaction($reference);
+                    if (data_get($verification, 'status') === 'success') {
+                        $payment->update([
+                            'paystack_reference' => data_get($verification, 'reference', $reference),
+                        ]);
+                        $foundUnfulfilledPayment = $payment;
+                        break;
+                    }
+                } catch (RuntimeException $exception) {
+                    continue;
+                }
+            }
+
+        }
+
+        if ($foundUnfulfilledPayment) {
+            $foundUnfulfilledPayment->update([
+                'access_point' => $accessPoint,
+                'callback_url' => $callbackUrl,
+                'status' => 'fulfilled',
+            ]);
+
+            $redirectUrl = $this->finalizeSuccessfulPayment($foundUnfulfilledPayment, $accessPoint);
+
+            return redirect()->away($redirectUrl);
+            ///$this->sendVoucherSms($payment, $voucher);
+
+        }
 
         try {
             DB::transaction(function () use ($plan, $reference, $accessPoint, $callbackUrl, $phoneNumber, $reservationWindow, &$payment, &$voucher): void {
@@ -117,5 +161,79 @@ class PaymentController extends Controller
             'authorization_url' => data_get($response, 'authorization_url'),
             'reference' => $payment->reference,
         ]);
+    }
+
+    protected function finalizeSuccessfulPayment(Payment $payment, string $accessPoint): ?string
+    {
+        $voucher = null;
+        $reservationWindow = Carbon::now()->subMinutes(15);
+
+        DB::transaction(function () use ($payment, $accessPoint, $reservationWindow, &$voucher): void {
+            $payment->update([
+                'status' => 'paid',
+                'paid_at' => $payment->paid_at ?? now(),
+                'access_point' => $accessPoint,
+            ]);
+
+            $voucher = Voucher::query()
+                ->where('payment_id', $payment->id)
+                ->whereIn('status', ['reserved', 'used'])
+                ->lockForUpdate()
+                ->first();
+
+            if ($voucher && $voucher->status === 'reserved') {
+                $voucher->update([
+                    'status' => 'used',
+                    'reserved_at' => null,
+                    'used_at' => now(),
+                ]);
+            }
+
+            if ($voucher) {
+                $payment->update([
+                    'status' => 'fulfilled',
+                ]);
+
+                return;
+            }
+
+            $voucher = Voucher::query()
+                ->where('plan_type', $payment->plan_type)
+                ->where(function ($query) use ($reservationWindow): void {
+                    $query->where('status', 'available')
+                        ->orWhere(function ($innerQuery) use ($reservationWindow): void {
+                            $innerQuery->where('status', 'reserved')
+                                ->where('reserved_at', '<=', $reservationWindow);
+                        });
+                })
+                ->lockForUpdate()
+                ->first();
+
+            if ($voucher) {
+                $voucher->update([
+                    'status' => 'used',
+                    'payment_id' => $payment->id,
+                    'reserved_at' => null,
+                    'used_at' => now(),
+                ]);
+
+                $payment->update([
+                    'status' => 'fulfilled',
+                ]);
+            }
+        });
+
+        if (! $voucher) {
+            return null;
+        }
+
+        return $this->buildAccessPointUrl($accessPoint, $voucher->code);
+    }
+
+    protected function buildAccessPointUrl(string $accessPoint, string $code): string
+    {
+        $separator = str_contains($accessPoint, '?') ? '&' : '?';
+
+        return $accessPoint.$separator.'voucher='.urlencode($code);
     }
 }
