@@ -46,12 +46,12 @@ class PaymentController extends Controller
         //if ($isCompletePayments->count() == 0) {
             // let verify transactions
             foreach ($last3PendingPayments as $payment) {
-                $reference = $payment->paystack_reference ?? $payment->reference;
+                $paystackReference = $payment->paystack_reference ?? $payment->reference;
                 try {
-                    $verification = $paystackClient->verifyTransaction($reference);
+                    $verification = $paystackClient->verifyTransaction($paystackReference);
                     if (data_get($verification, 'status') === 'success') {
                         $payment->update([
-                            'paystack_reference' => data_get($verification, 'reference', $reference),
+                            'paystack_reference' => data_get($verification, 'reference', $paystackReference),
                         ]);
                         $foundUnfulfilledPayment = $payment;
                         break;
@@ -78,6 +78,8 @@ class PaymentController extends Controller
             ///$this->sendVoucherSms($payment, $voucher);
 
         }
+
+        $reference = Str::random(15);
 
         try {
             DB::transaction(function () use ($plan, $reference, $accessPoint, $callbackUrl, $phoneNumber, $reservationWindow, &$payment, &$voucher): void {
