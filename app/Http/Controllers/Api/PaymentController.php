@@ -22,7 +22,7 @@ class PaymentController extends Controller
         $planType = $request->integer('plan_type');
         $plan = Plan::query()->where('plan_type', $planType)->firstOrFail();
 
-        $reference = Str::random(15);
+        
         $callbackUrl = route('api.paystack.callback');
         $accessPoint = (string) $request->string('url');
         $phoneNumber = $request->string('phone_number')->toString();
@@ -46,12 +46,12 @@ class PaymentController extends Controller
         //if ($isCompletePayments->count() == 0) {
             // let verify transactions
             foreach ($last3PendingPayments as $payment) {
-                $paystackReference = $payment->paystack_reference ?? $payment->reference;
+                $reference = $payment->paystack_reference ?? $payment->reference;
                 try {
-                    $verification = $paystackClient->verifyTransaction($paystackReference);
+                    $verification = $paystackClient->verifyTransaction($reference);
                     if (data_get($verification, 'status') === 'success') {
                         $payment->update([
-                            'paystack_reference' => data_get($verification, 'reference', $paystackReference),
+                            'paystack_reference' => data_get($verification, 'reference', $reference),
                         ]);
                         $foundUnfulfilledPayment = $payment;
                         break;
@@ -78,7 +78,6 @@ class PaymentController extends Controller
             ///$this->sendVoucherSms($payment, $voucher);
 
         }
-
         $reference = Str::random(15);
 
         try {
