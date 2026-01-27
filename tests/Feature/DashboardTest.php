@@ -50,9 +50,20 @@ test('dashboard shows payment statistics', function () {
     $response->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('Dashboard')
         ->where('stats.today_count', 1)
+        ->where('stats.today_amount', 5000)
         ->where('stats.month_count', 2)
+        ->where('stats.month_amount', 15000)
         ->where('stats.year_count', 3)
+        ->where('stats.year_amount', 35000)
         ->where('stats.total_subscribers', 2)
         ->where('stats.total_amount', 35000)
+        ->where('stats.total_payments', 3)
+        ->where('stats.paid_payments', 3)
+        ->where('stats.pending_payments', 0)
+        ->where('stats.failed_payments', 0)
+        ->where('stats.voucher_totals.total', 0)
+        ->where('stats.voucher_totals.available', 0)
+        ->where('stats.voucher_totals.reserved', 0)
+        ->where('stats.voucher_totals.used', 0)
         ->where('stats.currency', 'NGN'));
 });
