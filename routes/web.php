@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\VoucherController;
+use App\Models\Payment;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -15,7 +17,37 @@ Route::get('/', function () {
 })->name('home');
 
 Route::get('dashboard', function () {
-    return Inertia::render('Dashboard');
+    $paidStatuses = ['paid', 'fulfilled'];
+    $now = Carbon::now();
+    $todayStart = $now->copy()->startOfDay();
+    $todayEnd = $now->copy()->endOfDay();
+    $monthStart = $now->copy()->startOfMonth();
+    $yearStart = $now->copy()->startOfYear();
+
+    $baseQuery = Payment::query()
+        ->whereIn('status', $paidStatuses)
+        ->whereNotNull('paid_at');
+
+    $todayCount = (clone $baseQuery)->whereBetween('paid_at', [$todayStart, $todayEnd])->count();
+    $monthCount = (clone $baseQuery)->whereBetween('paid_at', [$monthStart, $todayEnd])->count();
+    $yearCount = (clone $baseQuery)->whereBetween('paid_at', [$yearStart, $todayEnd])->count();
+    $totalSubscribers = Payment::query()
+        ->whereIn('status', $paidStatuses)
+        ->whereNotNull('phone_number')
+        ->distinct('phone_number')
+        ->count('phone_number');
+    $totalAmount = (clone $baseQuery)->sum('amount');
+
+    return Inertia::render('Dashboard', [
+        'stats' => [
+            'today_count' => $todayCount,
+            'month_count' => $monthCount,
+            'year_count' => $yearCount,
+            'total_subscribers' => $totalSubscribers,
+            'total_amount' => $totalAmount,
+            'currency' => 'NGN',
+        ],
+    ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware('auth')
