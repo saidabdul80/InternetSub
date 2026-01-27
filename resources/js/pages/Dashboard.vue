@@ -25,6 +25,7 @@ const props = defineProps<{
             reserved: number;
             used: number;
         };
+        expected_amount: number;
         currency: string;
     };
 }>();
@@ -185,6 +186,19 @@ const breadcrumbs: BreadcrumbItem[] = [
                     <div class="text-sm text-muted-foreground">Used Vouchers</div>
                     <div class="mt-2 text-2xl font-semibold">
                         {{ props.stats.voucher_totals.used }}
+                    </div>
+                </div>
+                <div class="rounded-xl border border-sidebar-border/70 p-5">
+                    <div class="text-sm text-muted-foreground">Expected Amount</div>
+                    <div class="mt-2 text-2xl font-semibold">
+                        {{
+                            props.stats.currency +
+                            ' ' +
+                            (props.stats.expected_amount / 100).toFixed(2)
+                        }}
+                    </div>
+                    <div class="text-xs text-muted-foreground">
+                        based on all vouchers
                     </div>
                 </div>
             </div>

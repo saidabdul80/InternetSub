@@ -65,5 +65,6 @@ test('dashboard shows payment statistics', function () {
         ->where('stats.voucher_totals.available', 0)
         ->where('stats.voucher_totals.reserved', 0)
         ->where('stats.voucher_totals.used', 0)
+        ->where('stats.expected_amount', 0)
         ->where('stats.currency', 'NGN'));
 });

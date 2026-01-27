@@ -46,6 +46,9 @@ class DashboardController extends Controller
             'reserved' => Voucher::query()->where('status', 'reserved')->count(),
             'used' => Voucher::query()->where('status', 'used')->count(),
         ];
+        $expectedAmount = Voucher::query()
+            ->join('plans', 'vouchers.plan_type', '=', 'plans.plan_type')
+            ->sum('plans.amount');
 
         return Inertia::render('Dashboard', [
             'stats' => [
@@ -62,6 +65,7 @@ class DashboardController extends Controller
                 'pending_payments' => $pendingPayments,
                 'failed_payments' => $failedPayments,
                 'voucher_totals' => $voucherTotals,
+                'expected_amount' => $expectedAmount,
                 'currency' => 'NGN',
             ],
         ]);
