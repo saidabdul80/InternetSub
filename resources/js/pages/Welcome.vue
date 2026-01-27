@@ -71,7 +71,7 @@ withDefaults(
                         <p class="max-w-xl text-base text-[#cbe6e0] lg:text-lg">
                             Sell time-based internet plans, accept Paystack payments,
                             and auto-deliver access codes by SMS. Built for cafes,
-                            churches, events, and community hotspots.
+                            Schools, events, and community hotspots.
                         </p>
                     </div>
                     <div class="flex flex-wrap gap-3">
