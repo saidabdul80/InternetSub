@@ -30,7 +30,9 @@ class PaymentController extends Controller
         $payment = null;
         $voucher = null;
         $reservationWindow = Carbon::now()->subMinutes(15);
-        $last3PendingPayments = Payment::where('phone_number', $phoneNumber)->where('status', 'pending')
+        $last3PendingPayments = Payment::where('phone_number', $phoneNumber)
+            ->where('status', 'pending')
+            ->where('plan_type', $planType)
             ->latest()
             ->limit(3)
             ->get();
