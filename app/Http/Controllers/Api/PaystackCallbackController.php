@@ -152,17 +152,17 @@ class PaystackCallbackController extends Controller
             return;
         }
 
-        $messageText = sprintf('Your GoodNews Wi-Fi voucher code is %s.', $voucher->code);
-
+        $messageText = sprintf('Goodnews-Internet your pin is %s.', $voucher->code.'. Connect to Goodnews WiFi to start browsing POWERED BY ASHLABTECH');
         try {
-            Http::get($baseUrl, [
-                'username' => $username,
-                'apikey' => $apiKey,
-                'sender' => $senderName,
-                'messagetext' => $messageText,
-                'flash' => 0,
-                'recipients' => $recipient,
-                'dndsender' => 1,
+            // 'username' => $username,
+            // 'sender' => $senderName,
+            Http::post('https://v3.api.termii.com/api/sms/send', [
+                'api_key' => $apiKey,
+                'from'=>'N-Alert',
+                'sms' => $messageText,
+                'to' => $recipient,
+                'type'=>'plain',
+                'channel' => 'generic',
             ]);
         } catch (Throwable $exception) {
             report($exception);
