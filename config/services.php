@@ -41,7 +41,7 @@ return [
         'default_email' => env('PAYSTACK_DEFAULT_EMAIL', 'captive@example.com'),
     ],
     'sms' => [
-        'base_url' => env('SMS_BASE_URL', 'https://v3.api.termii.com'),
+        'base_url' => env('SMS_BASE_URL', 'https://v3.api.termii.com/api/sms/send'),
         'api_key' => env('SMS_API_KEY', 'XXX'),
         'email_address' => env('SMS_EMAIL_ADDRESS', 'XXX'),
         'sender_name' => 'N-Alert',
