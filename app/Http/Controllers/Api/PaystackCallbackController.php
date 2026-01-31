@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
@@ -144,26 +145,33 @@ class PaystackCallbackController extends Controller
 
         $config = config('services.sms');
         $baseUrl = (string) data_get($config, 'base_url');
-        $username = (string) data_get($config, 'email_address');
         $apiKey = (string) data_get($config, 'api_key');
         $senderName = (string) data_get($config, 'sender_name');
 
-        if ($baseUrl === '' || $username === '' || $apiKey === '' || $senderName === '') {
+        if ($baseUrl === '' || $apiKey === '' || $senderName === '') {
             return;
         }
 
-        $messageText = sprintf('Goodnews-Internet your pin is %s.', $voucher->code.'. Connect to Goodnews WiFi to start browsing POWERED BY ASHLABTECH');
+        $messageText = sprintf(
+            'Goodnews-Internet your pin is %s. Connect to Goodnews WiFi to start browsing POWERED BY ASHLABTECH.',
+            $voucher->code
+        );
         try {
-            // 'username' => $username,
-            // 'sender' => $senderName,
-            Http::post('https://v3.api.termii.com/api/sms/send', [
+            $response = Http::asJson()->post($baseUrl, [
                 'api_key' => $apiKey,
-                'from'=>'N-Alert',
+                'from' => $senderName,
                 'sms' => $messageText,
                 'to' => $recipient,
-                'type'=>'plain',
+                'type' => 'plain',
                 'channel' => 'generic',
             ]);
+            if (! $response->successful()) {
+                Log::warning('Termii SMS failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+            }
+            Log::info('Termii SMS response', [$response->json()]);
         } catch (Throwable $exception) {
             report($exception);
         }

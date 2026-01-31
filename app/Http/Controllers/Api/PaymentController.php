@@ -79,7 +79,7 @@ class PaymentController extends Controller
                 'reference' => $foundUnfulfilledPayment->reference,
             ]);
             $this->sendVoucherSms($payment, $voucher);
-
+    
         }
         $reference = Str::random(15);
 
