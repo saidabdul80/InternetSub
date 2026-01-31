@@ -11,6 +11,7 @@ use App\Services\PaystackClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -77,7 +78,7 @@ class PaymentController extends Controller
                 'redirect_url' => $redirectUrl,
                 'reference' => $foundUnfulfilledPayment->reference,
             ]);
-            ///$this->sendVoucherSms($payment, $voucher);
+            $this->sendVoucherSms($payment, $voucher);
 
         }
         $reference = Str::random(15);
@@ -171,6 +172,46 @@ class PaymentController extends Controller
         ]);
     }
 
+     protected function sendVoucherSms(Payment $payment, Voucher $voucher): void
+    {
+        $phoneNumber = (string) $payment->phone_number;
+        $recipient = preg_replace('/\D+/', '', $phoneNumber);
+
+        if ($recipient === '') {
+            return;
+        }
+
+        if (! str_starts_with($recipient, '234')) {
+            $recipient = ltrim($recipient, '0');
+            $recipient = '234'.$recipient;
+        }
+
+        $config = config('services.sms');
+        $baseUrl = (string) data_get($config, 'base_url');
+        $username = (string) data_get($config, 'email_address');
+        $apiKey = (string) data_get($config, 'api_key');
+        $senderName = (string) data_get($config, 'sender_name');
+
+        if ($baseUrl === '' || $username === '' || $apiKey === '' || $senderName === '') {
+            return;
+        }
+
+        $messageText = sprintf('Goodnews-Internet your pin is %s.', $voucher->code.'. Connect to Goodnews WiFi to start browsing POWERED BY ASHLABTECH');
+        try {
+            // 'username' => $username,
+            // 'sender' => $senderName,
+            Http::post('https://v3.api.termii.com/api/sms/send', [
+                'api_key' => $apiKey,
+                'from'=>'N-Alert',
+                'sms' => $messageText,
+                'to' => $recipient,
+                'type'=>'plain',
+                'channel' => 'generic',
+            ]);
+        } catch (\Exception $exception) {
+            Log::error($exception);
+        }
+    }
     protected function finalizeSuccessfulPayment(Payment $payment, string $accessPoint): ?string
     {
         $voucher = null;
