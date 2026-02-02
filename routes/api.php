@@ -8,3 +8,4 @@ use Illuminate\Support\Facades\Route;
 Route::post('/pay', [PaymentController::class, 'store'])->name('api.pay');
 Route::get('/paystack/callback', PaystackCallbackController::class)->name('api.paystack.callback');
 Route::post('/voucher/last', [VoucherController::class, 'last'])->name('api.voucher.last');
+Route::post('/webhook/{gateway?}', [PaystackCallbackController::class, 'handleWebhook'])->name('webhook.paystack');

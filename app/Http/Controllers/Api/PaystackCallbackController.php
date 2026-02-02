@@ -126,7 +126,7 @@ class PaystackCallbackController extends Controller
     {
         $separator = str_contains($accessPoint, '?') ? '&' : '?';
 
-        return $accessPoint.$separator.'voucher='.urlencode($code);
+        return $accessPoint . $separator . 'voucher=' . urlencode($code);
     }
 
     protected function sendVoucherSms(Payment $payment, Voucher $voucher): void
@@ -140,7 +140,7 @@ class PaystackCallbackController extends Controller
 
         if (! str_starts_with($recipient, '234')) {
             $recipient = ltrim($recipient, '0');
-            $recipient = '234'.$recipient;
+            $recipient = '234' . $recipient;
         }
 
         $config = config('services.sms');
@@ -175,5 +175,100 @@ class PaystackCallbackController extends Controller
         } catch (Throwable $exception) {
             report($exception);
         }
+    }
+
+    public function handleWebhook(Request $request)
+    {
+        $reference = $request->string('reference')->toString();
+
+        if ($reference === '') {
+            abort(400, 'Missing payment reference.');
+        }
+
+        $payment = Payment::query()
+            ->where('reference', $reference)
+            ->orWhere('paystack_reference', $reference)
+            ->first();
+        if ($payment) {
+            try {
+
+                $paystackClient = new PaystackClient();
+                $verification = $paystackClient->verifyTransaction($reference);
+            } catch (RuntimeException $exception) {
+                report($exception);
+
+                $payment->update([
+                    'status' => 'failed',
+                ]);
+
+                abort(502, 'Unable to verify payment.');
+            }
+
+            if (data_get($verification, 'status') !== 'success') {
+                $payment->update([
+                    'status' => 'failed',
+                ]);
+
+                abort(409, 'Payment was not successful.');
+            }
+
+            $voucher = null;
+            $reservationWindow = Carbon::now()->subMinutes(15);
+
+            DB::transaction(function () use ($payment, $reservationWindow, &$voucher): void {
+                $payment->update([
+                    'status' => 'paid',
+                    'paid_at' => now(),
+                ]);
+
+                $voucher = Voucher::query()
+                    ->where('payment_id', $payment->id)
+                    ->whereIn('status', ['reserved', 'used'])
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($voucher && $voucher->status === 'reserved') {
+                    $voucher->update([
+                        'status' => 'used',
+                        'reserved_at' => null,
+                        'used_at' => now(),
+                    ]);
+                }
+
+                if ($voucher) {
+                    $payment->update([
+                        'status' => 'fulfilled',
+                    ]);
+                }
+
+                if (! $voucher) {
+                    $voucher = Voucher::query()
+                        ->where('plan_type', $payment->plan_type)
+                        ->where(function ($query) use ($reservationWindow): void {
+                            $query->where('status', 'available')
+                                ->orWhere(function ($innerQuery) use ($reservationWindow): void {
+                                    $innerQuery->where('status', 'reserved')
+                                        ->where('reserved_at', '<=', $reservationWindow);
+                                });
+                        })
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($voucher) {
+                        $voucher->update([
+                            'status' => 'used',
+                            'payment_id' => $payment->id,
+                            'reserved_at' => null,
+                            'used_at' => now(),
+                        ]);
+
+                        $payment->update([
+                            'status' => 'fulfilled',
+                        ]);
+                    }
+                }
+            });
+        }
+        return response()->json(['message'=>'OK'],200);
     }
 }
