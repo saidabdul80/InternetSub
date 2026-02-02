@@ -29,6 +29,7 @@ class VoucherController extends Controller
         $payment = Payment::query()
             ->with('voucher')
             ->where('status', 'fulfilled')
+            ->where('plan_type', $request->plan_type)
             ->whereNotNull('paid_at')
             ->where(function ($query) use ($phoneNumber, $normalized, $local): void {
                 $query->where('phone_number', $phoneNumber)
