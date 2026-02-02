@@ -114,6 +114,24 @@ const formatAmount = (amount: number, currency: string) => {
     return `${currency} ${value.toFixed(2)}`;
 };
 
+const formatDateTime = (value: string | null) => {
+    if (!value) {
+        return '-';
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return value;
+    }
+    return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+    }).format(parsed);
+};
+
 const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
     if (statusLower.includes('success') || statusLower.includes('completed') || statusLower === 'used') {
@@ -483,10 +501,10 @@ const fulfillPayment = (paymentId: number) => {
                                         </td>
                                         <td class="px-6 py-4">
                                             <div class="text-sm">
-                                                {{ payment.paid_at || '-' }}
+                                                {{ formatDateTime(payment.paid_at) }}
                                             </div>
                                             <div class="text-xs text-muted-foreground">
-                                                {{ payment.created_at }}
+                                                {{ formatDateTime(payment.created_at) }}
                                             </div>
                                         </td>
                                         <td class="px-6 py-4">
@@ -597,14 +615,14 @@ const fulfillPayment = (paymentId: number) => {
                                             <div class="space-y-2">
                                                 <div class="text-sm">
                                                     <span class="font-medium">Reserved:</span>
-                                                    {{ voucher.reserved_at || '-' }}
+                                                    {{ formatDateTime(voucher.reserved_at) }}
                                                 </div>
                                                 <div class="text-sm">
                                                     <span class="font-medium">Used:</span>
-                                                    {{ voucher.used_at || '-' }}
+                                                    {{ formatDateTime(voucher.used_at) }}
                                                 </div>
                                                 <div class="text-xs text-muted-foreground">
-                                                    Created: {{ voucher.created_at }}
+                                                    Created: {{ formatDateTime(voucher.created_at) }}
                                                 </div>
                                             </div>
                                         </td>
