@@ -78,6 +78,17 @@ const form = useForm({
 
 const actionForm = useForm({});
 
+const purchaseForm = useForm({
+    phone_number: '',
+    plan_type: null as number | null,
+    payment_method: 'manual',
+    email: '',
+});
+
+const clearForm = useForm({
+    action: 'available',
+});
+
 const filterForm = useForm({
     phone_number: props.filters.phone_number ?? '',
     status: props.filters.status ?? '',
@@ -176,6 +187,32 @@ const fulfillPayment = (paymentId: number) => {
     actionForm.submit(fulfill(paymentId), {
         preserveScroll: true,
         preserveState: true,
+    });
+};
+
+const submitPurchase = () => {
+    purchaseForm.post('/admin/payments/purchase', {
+        preserveScroll: true,
+        onSuccess: () => {
+            if (purchaseForm.payment_method === 'manual') {
+                purchaseForm.reset('phone_number', 'email');
+            }
+        },
+    });
+};
+
+const submitClear = () => {
+    const message =
+        clearForm.action === 'available'
+            ? 'Delete ALL available vouchers? This cannot be undone.'
+            : 'Release ALL reserved vouchers back to available?';
+
+    if (!window.confirm(message)) {
+        return;
+    }
+
+    clearForm.post('/admin/vouchers/clear', {
+        preserveScroll: true,
     });
 };
 </script>
@@ -284,6 +321,144 @@ const fulfillPayment = (paymentId: number) => {
                         </div>
                     </form>
                 </div>
+            </div>
+
+            <!-- Manual Purchase Section -->
+            <div class="rounded-2xl border bg-card p-6 shadow-sm">
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold">Manual Purchase</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Create a voucher purchase for a phone number (manual or Paystack).
+                    </p>
+                </div>
+
+                <form @submit.prevent="submitPurchase" class="space-y-5">
+                    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <div class="space-y-2">
+                            <Label for="purchase-phone">Phone Number</Label>
+                            <Input
+                                id="purchase-phone"
+                                v-model="purchaseForm.phone_number"
+                                type="text"
+                                placeholder="+2348012345678"
+                            />
+                            <p v-if="purchaseForm.errors.phone_number" class="text-sm text-destructive">
+                                {{ purchaseForm.errors.phone_number }}
+                            </p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="purchase-plan">Plan</Label>
+                            <select
+                                id="purchase-plan"
+                                v-model.number="purchaseForm.plan_type"
+                                class="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                            >
+                                <option :value="null">Select plan</option>
+                                <option
+                                    v-for="plan in props.plans"
+                                    :key="plan.plan_type"
+                                    :value="plan.plan_type"
+                                >
+                                    {{ plan.name }} (Plan {{ plan.plan_type }})
+                                </option>
+                            </select>
+                            <p v-if="purchaseForm.errors.plan_type" class="text-sm text-destructive">
+                                {{ purchaseForm.errors.plan_type }}
+                            </p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="purchase-method">Payment Method</Label>
+                            <select
+                                id="purchase-method"
+                                v-model="purchaseForm.payment_method"
+                                class="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                            >
+                                <option value="manual">Manual (bypass Paystack)</option>
+                                <option value="paystack">Paystack</option>
+                            </select>
+                            <p v-if="purchaseForm.errors.payment_method" class="text-sm text-destructive">
+                                {{ purchaseForm.errors.payment_method }}
+                            </p>
+                        </div>
+
+                        <div class="space-y-2">
+                            <Label for="purchase-email">Email (Paystack)</Label>
+                            <Input
+                                id="purchase-email"
+                                v-model="purchaseForm.email"
+                                type="email"
+                                placeholder="optional@email.com"
+                                :disabled="purchaseForm.payment_method !== 'paystack'"
+                            />
+                            <p v-if="purchaseForm.errors.email" class="text-sm text-destructive">
+                                {{ purchaseForm.errors.email }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <Button
+                            type="submit"
+                            :disabled="purchaseForm.processing"
+                            class="min-w-[160px]"
+                        >
+                            {{ purchaseForm.processing ? 'Processing...' : 'Create Purchase' }}
+                        </Button>
+                        <p class="text-sm text-muted-foreground">
+                            Manual assigns a voucher immediately; Paystack redirects to checkout.
+                        </p>
+                    </div>
+
+                    <div
+                        v-if="flash?.error || flash?.success"
+                        class="rounded-lg border p-4"
+                        :class="flash.error ? 'border-destructive/20 bg-destructive/5' : 'border-green-200 bg-green-50'"
+                    >
+                        <p class="font-medium" :class="flash.error ? 'text-destructive' : 'text-green-800'">
+                            {{ flash.error || flash.success }}
+                        </p>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Maintenance Section -->
+            <div class="rounded-2xl border bg-card p-6 shadow-sm">
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold">Voucher Maintenance</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        Clear unused or release reserved vouchers.
+                    </p>
+                </div>
+
+                <form @submit.prevent="submitClear" class="space-y-4">
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <div class="space-y-2">
+                            <Label for="clear-action">Action</Label>
+                            <select
+                                id="clear-action"
+                                v-model="clearForm.action"
+                                class="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                            >
+                                <option value="available">Delete all available vouchers</option>
+                                <option value="reserved">Release all reserved vouchers</option>
+                            </select>
+                            <p v-if="clearForm.errors.action" class="text-sm text-destructive">
+                                {{ clearForm.errors.action }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <Button type="submit" variant="destructive" :disabled="clearForm.processing">
+                            {{ clearForm.processing ? 'Processing...' : 'Run Maintenance' }}
+                        </Button>
+                        <p class="text-sm text-muted-foreground">
+                            This applies to all vouchers with the selected status.
+                        </p>
+                    </div>
+                </form>
             </div>
 
             <!-- Plans Section -->

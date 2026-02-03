@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -284,5 +285,17 @@ class PaymentController extends Controller
         $separator = str_contains($accessPoint, '?') ? '&' : '?';
 
         return $accessPoint.$separator.'voucher='.urlencode($code);
+    }
+
+    public function update(Request $request){
+        $voucher = $request->voucher_code;
+
+        Voucher::where('code', $voucher)->update([
+                    'status' => 'used',
+                    'reserved_at' => null,
+                    'used_at' => now()
+        ]);
+        return response()->json(['message'=>'ok']);
+
     }
 }

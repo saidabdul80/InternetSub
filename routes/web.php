@@ -25,10 +25,13 @@ Route::middleware('auth')
     ->group(function () {
         Route::get('vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
         Route::post('vouchers/upload', [VoucherController::class, 'store'])->name('vouchers.upload');
+        Route::post('vouchers/clear', [VoucherController::class, 'clear'])->name('vouchers.clear');
         Route::post('payments/{payment}/reverify', [PaymentController::class, 'reverify'])
             ->name('payments.reverify');
         Route::post('payments/{payment}/fulfill', [PaymentController::class, 'fulfill'])
             ->name('payments.fulfill');
+        Route::post('payments/purchase', [PaymentController::class, 'purchase'])
+            ->name('payments.purchase');
     });
 
 Route::get('send/sms', function () {

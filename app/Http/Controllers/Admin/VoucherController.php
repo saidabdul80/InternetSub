@@ -158,6 +158,33 @@ class VoucherController extends Controller
         return back()->with('success', $message);
     }
 
+    public function clear(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'action' => ['required', 'string', 'in:available,reserved'],
+        ]);
+
+        if ($data['action'] === 'available') {
+            $deleted = Voucher::query()
+                ->where('status', 'available')
+                ->delete();
+
+            return back()->with('success', "Deleted {$deleted} available vouchers.");
+        }
+
+        $released = Voucher::query()
+            ->where('status', 'reserved')
+            ->update([
+                'status' => 'available',
+                'payment_id' => null,
+                'reserved_at' => null,
+                'used_at' => null,
+                'updated_at' => now(),
+            ]);
+
+        return back()->with('success', "Released {$released} reserved vouchers.");
+    }
+
     protected function parseFile(UploadedFile $file): array
     {
         $contents = (string) $file->get();
