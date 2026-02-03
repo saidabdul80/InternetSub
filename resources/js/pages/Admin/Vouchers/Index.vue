@@ -424,7 +424,7 @@ const submitClear = () => {
             </div>
 
             <!-- Maintenance Section -->
-            <div class="rounded-2xl border bg-card p-6 shadow-sm">
+            <!-- <div class="rounded-2xl border bg-card p-6 shadow-sm">
                 <div class="mb-6">
                     <h2 class="text-xl font-semibold">Voucher Maintenance</h2>
                     <p class="mt-1 text-sm text-muted-foreground">
@@ -459,7 +459,7 @@ const submitClear = () => {
                         </p>
                     </div>
                 </form>
-            </div>
+            </div> -->
 
             <!-- Plans Section -->
             <div class="rounded-2xl border bg-card p-6 shadow-sm" v-if="showPlan">
