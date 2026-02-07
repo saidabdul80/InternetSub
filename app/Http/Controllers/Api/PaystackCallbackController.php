@@ -20,8 +20,11 @@ class PaystackCallbackController extends Controller
     public function __invoke(Request $request, GatewayFactory $gatewayFactory): RedirectResponse
     {
 
-        $reference = $request->string('reference')->toString();
-
+        $gateway = $request->gateway;
+        $reference = $request->reference;
+        if($gateway == 'monnify'){
+            $reference = $request->paymentReference;
+        }
         if ($reference === '') {
             abort(400, 'Missing payment reference.');
         }
@@ -34,7 +37,7 @@ class PaystackCallbackController extends Controller
         if (! $payment) {
             abort(404, 'Payment not found.');
         }
-        $gateway = $payment->gateway ?: 'paystack';
+        $gateway = $payment->gateway ? $gateway : 'paystack';
         $gatewayClient = $gatewayFactory->create($gateway);
         try {
             $verification = $gatewayClient->verifyTransaction($reference);

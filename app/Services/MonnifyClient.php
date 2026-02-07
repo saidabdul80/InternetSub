@@ -52,8 +52,6 @@ class MonnifyClient implements GatewayInterface
                 }
                 
         $body = data_get($data, 'responseBody', []);
-        Log::info(data_get($body, 'checkoutUrl'));
-
         return [
             'reference' => data_get($body, 'transactionReference'),
             'authorization_url' => data_get($body, 'checkoutUrl'),
