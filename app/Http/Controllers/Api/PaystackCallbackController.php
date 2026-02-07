@@ -22,7 +22,9 @@ class PaystackCallbackController extends Controller
 
         $gateway = $request->gateway;
         $reference = $request->reference;
-        if($gateway == 'monnify'){
+        Log::info($gateway);
+        if(str_contains($gateway,'monnify')){
+            
             $reference = $request->paymentReference;
         }
         if ($reference === '') {
