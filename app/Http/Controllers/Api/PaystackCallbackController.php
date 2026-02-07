@@ -24,8 +24,9 @@ class PaystackCallbackController extends Controller
         $reference = $request->reference;
         Log::info($gateway);
         if(str_contains($gateway,'monnify')){
-            
-            $reference = $request->paymentReference;
+            $ex = explode('?',$gateway);
+            $gateway = $ex[0];
+            $reference = str_replace('paymentReference','',$ex[1]);// $request->paymentReference;
         }
         if ($reference === '') {
             abort(400, 'Missing payment reference.');
