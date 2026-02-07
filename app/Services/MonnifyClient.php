@@ -40,18 +40,18 @@ class MonnifyClient implements GatewayInterface
             ->post('/api/v1/merchant/transactions/init-transaction', $requestPayload);
 
         if (! $response->successful()) {
-            //Log::info('moniify',[$response->body()]);
             throw new RuntimeException('Monnify initialization failed.');
-        }
-
-        $data = $response->json();
-
-        if (! data_get($data, 'requestSuccessful')) {
-            $message = (string) data_get($data, 'responseMessage', 'Monnify returned an unsuccessful response.');
-            throw new RuntimeException($message);
-        }
-
+            }
+            
+            $data = $response->json();
+            
+            if (! data_get($data, 'requestSuccessful')) {
+                $message = (string) data_get($data, 'responseMessage', 'Monnify returned an unsuccessful response.');
+                throw new RuntimeException($message);
+                }
+                
         $body = data_get($data, 'responseBody', []);
+        Log::info(data_get($body, 'checkoutUrl'));
 
         return [
             'reference' => data_get($body, 'transactionReference'),
