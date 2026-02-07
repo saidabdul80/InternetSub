@@ -22,21 +22,23 @@ class PaystackCallbackController extends Controller
 
         $gateway = $request->gateway;
         $reference = $request->reference;
-        Log::info($gateway);
+        
         if(str_contains($gateway,'monnify')){
             $ex = explode('?',$gateway);
             $gateway = $ex[0];
-            $reference = str_replace('paymentReference','',$ex[1]);// $request->paymentReference;
+            $reference = str_replace('paymentReference=','',$ex[1]);// $request->paymentReference;
         }
         if ($reference === '') {
             abort(400, 'Missing payment reference.');
         }
 
+        Log::info($gateway,[
+            $reference
+        ]);
         $payment = Payment::query()
             ->where('reference', $reference)
             ->orWhere('paystack_reference', $reference)
             ->first();
-
         if (! $payment) {
             abort(404, 'Payment not found.');
         }
