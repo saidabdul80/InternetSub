@@ -32,9 +32,7 @@ class PaystackCallbackController extends Controller
             abort(400, 'Missing payment reference.');
         }
 
-        Log::info($gateway,[
-            $reference
-        ]);
+ 
         $payment = Payment::query()
             ->where('reference', $reference)
             ->orWhere('paystack_reference', $reference)
@@ -42,6 +40,12 @@ class PaystackCallbackController extends Controller
         if (! $payment) {
             abort(404, 'Payment not found.');
         }
+        if($payment->gateway == 'monnify'){
+           $reference = $payment->paystack_reference;
+        }
+        Log::info($gateway,[
+            $reference
+        ]);
         $gateway = $payment->gateway ? $gateway : 'paystack';
         $gatewayClient = $gatewayFactory->create($gateway);
         try {

@@ -163,15 +163,9 @@ class PaymentController extends Controller
         }
 
         $gatewayReference = data_get($response, 'reference', $reference);
-        if ($gateway === 'monnify') {
-            $payment->update([
-                'reference' => $gatewayReference,
-            ]);
-        } else {
-            $payment->update([
-                'paystack_reference' => $gatewayReference,
-            ]);
-        }
+        $payment->update([
+            'paystack_reference' => $gatewayReference,
+        ]);
 
         return response()->json([
             'authorization_url' => data_get($response, 'authorization_url'),
