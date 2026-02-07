@@ -26,6 +26,7 @@ class CreatePaymentRequest extends FormRequest
             // 'url' => ['required', 'string', 'max:2048', 'url'],
             'email' => ['nullable', 'string', 'email', 'max:255'],
             'phone_number' => ['required', 'string', 'max:20', 'regex:/^\\+?\\d{8,20}$/'],
+            'gateway' => ['nullable', 'string', 'in:paystack,monnify'],
         ];
     }
 
@@ -39,6 +40,7 @@ class CreatePaymentRequest extends FormRequest
             'email.email' => 'Please provide a valid email address.',
             'phone_number.required' => 'Please provide a phone number.',
             'phone_number.regex' => 'Please provide a valid phone number.',
+            'gateway.in' => 'The selected payment gateway is invalid.',
         ];
     }
 }

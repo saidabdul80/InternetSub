@@ -24,6 +24,7 @@ class Payment extends Model
         'status',
         'paystack_reference',
         'paid_at',
+        'gateway'
     ];
 
     public function plan(): BelongsTo

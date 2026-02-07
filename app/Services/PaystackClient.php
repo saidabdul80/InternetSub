@@ -5,7 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
-class PaystackClient
+class PaystackClient implements GatewayInterface
 {
     public function initializeTransaction(array $payload): array
     {
@@ -24,7 +24,14 @@ class PaystackClient
             throw new RuntimeException('Paystack returned an unsuccessful response.');
         }
 
-        return data_get($data, 'data', []);
+        $body = data_get($data, 'data', []);
+
+        return [
+            'reference' => data_get($body, 'reference'),
+            'authorization_url' => data_get($body, 'authorization_url'),
+            'status' => 'success',
+            'raw' => $body,
+        ];
     }
 
     public function verifyTransaction(string $reference): array
@@ -44,7 +51,13 @@ class PaystackClient
             throw new RuntimeException('Paystack returned an unsuccessful response.');
         }
 
-        return data_get($data, 'data', []);
+        $body = data_get($data, 'data', []);
+
+        return [
+            'reference' => data_get($body, 'reference'),
+            'status' => data_get($body, 'status'),
+            'raw' => $body,
+        ];
     }
 
     protected function secretKey(): string

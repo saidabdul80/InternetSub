@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Models\Voucher;
-use App\Services\PaystackClient;
+use App\Services\GatewayFactory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -17,7 +17,7 @@ use Throwable;
 
 class PaystackCallbackController extends Controller
 {
-    public function __invoke(Request $request, PaystackClient $paystackClient): RedirectResponse
+    public function __invoke(Request $request, GatewayFactory $gatewayFactory): RedirectResponse
     {
 
         $reference = $request->string('reference')->toString();
@@ -34,9 +34,10 @@ class PaystackCallbackController extends Controller
         if (! $payment) {
             abort(404, 'Payment not found.');
         }
-
+        $gateway = $payment->gateway ?: 'paystack';
+        $gatewayClient = $gatewayFactory->create($gateway);
         try {
-            $verification = $paystackClient->verifyTransaction($reference);
+            $verification = $gatewayClient->verifyTransaction($reference);
         } catch (RuntimeException $exception) {
             report($exception);
 
@@ -177,7 +178,7 @@ class PaystackCallbackController extends Controller
         }
     }
 
-    public function handleWebhook(Request $request)
+    public function handleWebhook(Request $request, GatewayFactory $gatewayFactory)
     {
         $reference = $request->string('reference')->toString();
 
@@ -190,10 +191,10 @@ class PaystackCallbackController extends Controller
             ->orWhere('paystack_reference', $reference)
             ->first();
         if ($payment) {
+            $gateway = $payment->gateway ?: 'paystack';
+            $gatewayClient = $gatewayFactory->create($gateway);
             try {
-
-                $paystackClient = new PaystackClient();
-                $verification = $paystackClient->verifyTransaction($reference);
+                $verification = $gatewayClient->verifyTransaction($reference);
             } catch (RuntimeException $exception) {
                 report($exception);
 

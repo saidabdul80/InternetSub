@@ -7,7 +7,8 @@ use App\Http\Requests\CreatePaymentRequest;
 use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Voucher;
-use App\Services\GatewayFactory;
+use App\Services\MonnifyClient;
+use App\Services\PaystackClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -19,28 +20,36 @@ use RuntimeException;
 
 class PaymentController extends Controller
 {
-    public function store(CreatePaymentRequest $request, GatewayFactory $gatewayFactory)
+    public function store(CreatePaymentRequest $request, PaystackClient $paystackClient, MonnifyClient $monnifyClient)
     {
         $planType = $request->integer('plan_type');
         $plan = Plan::query()->where('plan_type', $planType)->firstOrFail();
         $gateway = $request->string('gateway', 'paystack')->toString();
-        $gatewayClient = $gatewayFactory->create($gateway);
 
         
-        $callbackUrl = route('api.callback').'?='.$gateway;
+        $callbackUrl = route('api.paystack.callback');
         $accessPoint = (string) $request->string('url');
         $phoneNumber = $request->string('phone_number')->toString();
 
         $payment = null;
         $voucher = null;
         $reservationWindow = Carbon::now()->subMinutes(15);
-        $last3PendingPayments = Payment::where('phone_number', $phoneNumber)
-            ->where('status', 'pending')
-            ->where('plan_type', $planType)
-            ->where('gateway', $gateway)
-            ->latest()
-            ->limit(3)
-            ->get();
+        $last3PendingPayments = collect();
+        if ($gateway === 'paystack') {
+            $last3PendingPayments = Payment::where('phone_number', $phoneNumber)
+                ->where('status', 'pending')
+                ->where('plan_type', $planType)
+                ->latest()
+                ->limit(3)
+                ->get();
+        }
+       // Log::info('Last 3 pending payments: '.json_encode($last3PendingPayments));
+        // check if any of the last 3 pending payments that is either paid or fulfilled using filter
+        // $isCompletePayments = $last3PendingPayments->filter(function ($payment) {
+        //     return in_array($payment->status, ['paid', 'fulfilled']);
+        // });
+        //Log::info('isCompletePayments: '.json_encode($isCompletePayments));
+
 
         $foundUnfulfilledPayment = null;
         //if ($isCompletePayments->count() == 0) {
@@ -48,17 +57,11 @@ class PaymentController extends Controller
             foreach ($last3PendingPayments as $payment) {
                 $reference = $payment->paystack_reference ?? $payment->reference;
                 try {
-                    $verification = $gatewayClient->verifyTransaction($reference);
+                    $verification = $paystackClient->verifyTransaction($reference);
                     if (data_get($verification, 'status') === 'success') {
-                        if ($gateway === 'monnify') {
-                            $payment->update([
-                                'reference' => data_get($verification, 'reference', $reference),
-                            ]);
-                        } else {
-                            $payment->update([
-                                'paystack_reference' => data_get($verification, 'reference', $reference),
-                            ]);
-                        }
+                        $payment->update([
+                            'paystack_reference' => data_get($verification, 'reference', $reference),
+                        ]);
                         $foundUnfulfilledPayment = $payment;
                         break;
                     }
@@ -87,7 +90,7 @@ class PaymentController extends Controller
         $reference = Str::random(15);
 
         try {
-            DB::transaction(function () use ($plan, $reference, $accessPoint, $callbackUrl, $phoneNumber, $reservationWindow, &$payment, &$voucher, $gateway): void {
+            DB::transaction(function () use ($plan, $reference, $accessPoint, $callbackUrl, $phoneNumber, $reservationWindow, &$payment, &$voucher): void {
                 $payment = Payment::query()->create([
                     'plan_id' => $plan->id,
                     'plan_type' => $plan->plan_type,
@@ -98,7 +101,6 @@ class PaymentController extends Controller
                     'callback_url' => $callbackUrl,
                     'phone_number' => $phoneNumber,
                     'status' => 'pending',
-                    'gateway'=>$gateway
                 ]);
 
                 $voucher = Voucher::query()
@@ -133,11 +135,70 @@ class PaymentController extends Controller
             throw $exception;
         }
 
+        if ($gateway === 'monnify') {
+            try {
+                $response = $monnifyClient->initializeTransaction([
+                    'amount' => $plan->amount / 100,
+                    'customerEmail' => $request->input('email', config('services.paystack.default_email')),
+                    'paymentReference' => $reference,
+                    'paymentDescription' => $plan->name ?? 'Voucher purchase',
+                    'currencyCode' => $plan->currency,
+                    'contractCode' => config('services.monnify.contract_code'),
+                    'redirectUrl' => $callbackUrl,
+                    'paymentMethods' => [
+                        'CARD',
+                        'ACCOUNT_TRANSFER',
+                        'USSD',
+                        'PHONE_NUMBER',
+                    ],
+                    'metadata' => [
+                        'payment_id' => $payment->id,
+                        'plan_type' => $plan->plan_type,
+                        'access_point' => $accessPoint,
+                        'phone_number' => $phoneNumber,
+                    ],
+                ]);
+            } catch (RuntimeException $exception) {
+                report($exception);
+
+                $payment->update([
+                    'status' => 'failed',
+                ]);
+
+                if ($voucher) {
+                    $voucher->update([
+                        'status' => 'available',
+                        'payment_id' => null,
+                        'reserved_at' => null,
+                    ]);
+                }
+
+                return response()->json([
+                    'message' => 'Unable to initialize Monnify payment.',
+                ], 502);
+            }
+
+            $transactionReference = (string) data_get($response, 'transactionReference');
+
+            if ($transactionReference === '') {
+                return response()->json([
+                    'message' => 'Monnify did not return a transaction reference.',
+                ], 502);
+            }
+
+            $payment->update([
+                'reference' => $transactionReference,
+            ]);
+
+            return response()->json([
+                'authorization_url' => data_get($response, 'checkoutUrl'),
+                'reference' => $payment->reference,
+            ]);
+        }
+
         try {
-            $response = $gatewayClient->initializeTransaction([
+            $response = $paystackClient->initializeTransaction([
                 'amount' => $plan->amount,
-                'currency' => $plan->currency,
-                'description' => $plan->name ?? 'Voucher purchase',
                 'email' => $request->input('email', config('services.paystack.default_email')),
                 'reference' => $reference,
                 'callback_url' => $callbackUrl,
@@ -168,16 +229,9 @@ class PaymentController extends Controller
             ], 502);
         }
 
-        $gatewayReference = data_get($response, 'reference', $reference);
-        if ($gateway === 'monnify') {
-            $payment->update([
-                'reference' => $gatewayReference,
-            ]);
-        } else {
-            $payment->update([
-                'paystack_reference' => $gatewayReference,
-            ]);
-        }
+        $payment->update([
+            'paystack_reference' => data_get($response, 'reference', $reference),
+        ]);
 
         return response()->json([
             'authorization_url' => data_get($response, 'authorization_url'),

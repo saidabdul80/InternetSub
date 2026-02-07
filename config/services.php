@@ -40,6 +40,12 @@ return [
         'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
         'default_email' => env('PAYSTACK_DEFAULT_EMAIL', 'captive@example.com'),
     ],
+    'monnify' => [
+        'base_url' => env('MONNIFY_BASE_URL', 'https://sandbox.monnify.com'),
+        'public_key' => env('MONNIFY_PUBLIC_KEY'),
+        'secret_key' => env('MONNIFY_SECRET_KEY'),
+        'contract_code' => env('MONNIFY_CONTRACT_CODE', ''),
+    ],
     'sms' => [
         'base_url' => env('SMS_BASE_URL', 'https://v3.api.termii.com/api/sms/send'),
         'api_key' => env('SMS_API_KEY', 'XXX'),
