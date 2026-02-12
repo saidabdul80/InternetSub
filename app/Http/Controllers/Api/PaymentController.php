@@ -29,8 +29,8 @@ class PaymentController extends Controller
         
         $callbackUrl = route('api.callback').'?gateway='.$gateway;
         $accessPoint = (string) $request->string('url');
-        $phoneNumber = $request->string('phone_number')->toString();
-
+        $phoneNumber = $this->normalizeNigerianPhone($request->string('phone_number')->toString());
+       
         $payment = null;
         $voucher = null;
         $reservationWindow = Carbon::now()->subMinutes(15);
@@ -75,7 +75,7 @@ class PaymentController extends Controller
                 'redirect_url' => $redirectUrl,
                 'reference' => $foundUnfulfilledPayment->reference,
             ]);
-            $this->sendVoucherSms($payment, $voucher);
+          //  $this->sendVoucherSms($payment, $voucher);
     
         }
         $reference = Str::random(15);
@@ -171,6 +171,21 @@ class PaymentController extends Controller
             'authorization_url' => data_get($response, 'authorization_url'),
             'reference' => $payment->reference,
         ]);
+    }
+
+    function normalizeNigerianPhone($phone)
+    {
+        $normalized = preg_replace('/\D+/', '', $phone);
+
+        if (str_starts_with($normalized, '234')) {
+            $normalized = substr($normalized, 3);
+        }
+
+        if (!str_starts_with($normalized, '0')) {
+            $normalized = '0' . $normalized;
+        }
+
+        return $normalized;
     }
 
      protected function sendVoucherSms(Payment $payment, Voucher $voucher): void
