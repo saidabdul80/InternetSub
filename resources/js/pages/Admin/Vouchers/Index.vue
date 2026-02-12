@@ -76,7 +76,9 @@ const form = useForm({
     file: null as File | null,
 });
 
-const actionForm = useForm({});
+const actionForm = useForm({
+    payment_id: null as number | null,
+});
 
 const purchaseForm = useForm({
     phone_number: '',
@@ -177,16 +179,20 @@ const clearFilters = () => {
 };
 
 const reverifyPayment = (paymentId: number) => {
-    actionForm.submit(reverify(paymentId), {
+    actionForm.payment_id = paymentId;
+    actionForm.post(reverify(paymentId).url, {
         preserveScroll: true,
         preserveState: true,
+        onFinish: () => actionForm.reset('payment_id'),
     });
 };
 
 const fulfillPayment = (paymentId: number) => {
-    actionForm.submit(fulfill(paymentId), {
+    actionForm.payment_id = paymentId;
+    actionForm.post(fulfill(paymentId).url, {
         preserveScroll: true,
         preserveState: true,
+        onFinish: () => actionForm.reset('payment_id'),
     });
 };
 
