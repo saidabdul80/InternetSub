@@ -21,6 +21,7 @@ interface Payment {
     id: number;
     reference: string;
     status: string;
+    gateway: string | null;
     phone_number: string | null;
     amount: number;
     currency: string;
@@ -623,6 +624,9 @@ const submitClear = () => {
                                             Status
                                         </th>
                                         <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            Gateway
+                                        </th>
+                                        <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                             Voucher
                                         </th>
                                         <th class="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -671,6 +675,11 @@ const submitClear = () => {
                                             </span>
                                         </td>
                                         <td class="px-6 py-4">
+                                            <div class="text-sm font-medium">
+                                                {{ payment.gateway || '-' }}
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4">
                                             <div class="space-y-1">
                                                 <div class="font-mono text-sm">
                                                     {{ payment.voucher.code || 'Not assigned' }}
@@ -711,7 +720,7 @@ const submitClear = () => {
                                         </td>
                                     </tr>
                                     <tr v-if="props.payments.length === 0">
-                                        <td colspan="7" class="px-6 py-12 text-center">
+                                        <td colspan="8" class="px-6 py-12 text-center">
                                             <div class="space-y-2">
                                                 <div class="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
                                                     <svg class="h-6 w-6 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">

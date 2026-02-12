@@ -46,7 +46,9 @@ class VoucherController extends Controller
             ->map(fn (Payment $payment) => [
                 'id' => $payment->id,
                 'reference' => $payment->reference,
+                'paystack_reference' => $payment->paystack_reference,
                 'status' => $payment->status,
+                'gateway' => $payment->gateway,
                 'phone_number' => $payment->phone_number,
                 'amount' => $payment->amount,
                 'currency' => $payment->currency,
