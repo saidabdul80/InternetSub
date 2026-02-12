@@ -37,7 +37,6 @@ class PaymentController extends Controller
         $last3PendingPayments = Payment::where('phone_number', $phoneNumber)
             ->where('status', 'pending')
             ->where('plan_type', $planType)
-            ->where('gateway', $gateway)
             ->latest()
             ->limit(3)
             ->get();
