@@ -23,9 +23,7 @@ class PaymentController extends Controller
             return back()->with('error', 'Manual payments cannot be reverified.');
         }
 
-        $reference = $gateway === 'paystack'
-            ? ($payment->paystack_reference ?? $payment->reference)
-            : $payment->reference;
+        $reference = $payment->paystack_reference ?? $payment->reference;
 
         $gatewayClient = $gatewayFactory->create($gateway);
 
