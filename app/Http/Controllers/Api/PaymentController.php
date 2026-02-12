@@ -47,7 +47,8 @@ class PaymentController extends Controller
             foreach ($last3PendingPayments as $payment) {
                 $reference = $payment->paystack_reference ?? $payment->reference;
                 try {
-                    $verification = $gatewayClient->verifyTransaction($reference);
+                    $gatewayClient2 = $gatewayFactory->create($payment->gateway);
+                    $verification = $gatewayClient2->verifyTransaction($reference);
                     if (data_get($verification, 'status') === 'success') {
                         $payment->update([
                             'paystack_reference' => data_get($verification, 'reference', $reference),
