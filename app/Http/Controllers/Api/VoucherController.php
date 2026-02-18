@@ -37,7 +37,6 @@ class VoucherController extends Controller
             ->when(is_numeric($planType), function ($query) use ($planType): void {
                 $query->where('plan_type', (int) $planType);
             })
-            ->whereNotNull('paid_at')
             ->where(function ($query) use ($phoneNumber, $normalized, $local): void {
                 $query->where('phone_number', $phoneNumber)
                     ->orWhere('phone_number', 'like', '%'.$normalized.'%')
