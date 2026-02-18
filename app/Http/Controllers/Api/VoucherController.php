@@ -30,7 +30,7 @@ class VoucherController extends Controller
             $local = substr($normalized, 3);
         }
         $local = ltrim($local, '0');
-
+        $local = '0' . $normalized;
         $payment = Payment::query()
             ->with('voucher')
             ->where('status', 'fulfilled')
