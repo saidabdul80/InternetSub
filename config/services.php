@@ -39,6 +39,10 @@ return [
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
         'base_url' => env('PAYSTACK_BASE_URL', 'https://api.paystack.co'),
         'default_email' => env('PAYSTACK_DEFAULT_EMAIL', 'captive@example.com'),
+        'channels' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('PAYSTACK_CHANNELS', 'card,bank,ussd,bank_transfer,qr,mobile_money,eft'))
+        ))),
     ],
     'monnify' => [
         'base_url' => env('MONNIFY_BASE_URL', 'https://sandbox.monnify.com'),

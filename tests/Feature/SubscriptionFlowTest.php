@@ -63,6 +63,56 @@ test('subscription start skips payment when phone has active mikrotik user', fun
     expect(Payment::query()->count())->toBe(0);
 });
 
+test('subscription start initializes paystack with configured checkout channels', function () {
+    config([
+        'services.paystack.secret_key' => 'test-secret',
+        'services.paystack.base_url' => 'https://api.paystack.co',
+        'services.paystack.default_email' => 'guest@example.com',
+        'services.paystack.channels' => ['card', 'bank', 'ussd', 'bank_transfer', 'qr'],
+    ]);
+
+    Plan::factory()->create([
+        'plan_type' => 1,
+        'name' => '4 Hours Unlimited Access',
+        'amount' => 10000,
+        'currency' => 'NGN',
+    ]);
+
+    Http::fake([
+        'https://api.paystack.co/transaction/initialize' => Http::response([
+            'status' => true,
+            'data' => [
+                'authorization_url' => 'https://paystack.test/authorize',
+                'reference' => 'ps_ref_123',
+            ],
+        ]),
+    ]);
+
+    $response = $this->post('/app/start', [
+        'plan_type' => 1,
+        'gateway' => 'paystack',
+        'phone_number' => '08012345678',
+        'hotspot_return' => 'https://hotspot.test/login',
+        'hotspot_dst' => 'https://example.com',
+    ]);
+
+    $response->assertRedirect('https://paystack.test/authorize');
+
+    Http::assertSent(function ($request): bool {
+        return $request->url() === 'https://api.paystack.co/transaction/initialize'
+            && data_get($request->data(), 'email') === 'guest@example.com'
+            && data_get($request->data(), 'channels') === ['card', 'bank', 'ussd', 'bank_transfer', 'qr']
+            && data_get($request->data(), 'metadata.phone_number') === '08012345678'
+            && data_get($request->data(), 'metadata.custom_fields.0.variable_name') === 'phone_number';
+    });
+
+    $payment = Payment::query()->latest('id')->first();
+
+    expect($payment)->not->toBeNull()
+        ->and($payment?->paystack_reference)->toBe('ps_ref_123')
+        ->and($payment?->status)->toBe('pending');
+});
+
 test('payment callback provisions mikrotik user and redirects to hotspot login', function () {
     config([
         'services.paystack.secret_key' => 'test-secret',
