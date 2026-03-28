@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\VoucherController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Portal\SubscriptionController;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,14 @@ Route::get('/', function () {
         'canRegister' => Features::enabled(Features::registration()),
     ]);
 })->name('home');
+
+Route::prefix('app')
+    ->name('portal.')
+    ->group(function () {
+        Route::get('/', [SubscriptionController::class, 'index'])->name('plans');
+        Route::post('/start', [SubscriptionController::class, 'start'])->name('start');
+        Route::get('/callback/{gateway?}', [SubscriptionController::class, 'callback'])->name('callback');
+    });
 
 Route::get('dashboard', DashboardController::class)
     ->middleware(['auth', 'verified'])

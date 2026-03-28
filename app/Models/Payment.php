@@ -19,12 +19,13 @@ class Payment extends Model
         'amount',
         'currency',
         'access_point',
+        'hotspot_dst',
         'callback_url',
         'phone_number',
         'status',
         'paystack_reference',
         'paid_at',
-        'gateway'
+        'gateway',
     ];
 
     public function plan(): BelongsTo

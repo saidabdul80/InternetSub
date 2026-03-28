@@ -27,8 +27,11 @@ class PaymentFactory extends Factory
             'amount' => $plan->amount,
             'currency' => $plan->currency,
             'access_point' => $this->faker->url(),
+            'hotspot_dst' => $this->faker->url(),
             'callback_url' => $this->faker->url(),
+            'phone_number' => '+234'.$this->faker->numerify('8#########'),
             'status' => 'pending',
+            'gateway' => 'paystack',
         ];
     }
 }
