@@ -231,37 +231,7 @@ const submit = (): void => {
                 </p>
             </header>
 
-            <div class="mb-4 flex flex-wrap gap-2 sm:mb-5">
-                <!-- <span
-                    class="rounded-full border px-3 py-1 text-[11px] font-semibold tracking-[0.16em] uppercase"
-                    :class="
-                        hasHotspotReturn
-                            ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-100'
-                            : 'border-rose-300/30 bg-rose-400/10 text-rose-100'
-                    "
-                >
-                    {{ hasHotspotReturn ? 'Portal ready' : 'Portal missing' }}
-                </span> -->
-                <span
-                    v-if="selectedPlan"
-                    class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-white uppercase"
-                >
-                    {{ selectedPlan.name }}
-                </span>
-                <span
-                    v-if="hasValidPhone"
-                    class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-white uppercase"
-                >
-                    {{ phonePreview }}
-                </span>
-                <span
-                    v-if="selectedGatewayMeta"
-                    class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-white uppercase"
-                >
-                    {{ selectedGatewayMeta.label }}
-                </span>
-            </div>
-
+           
             <div
                 v-if="!hasHotspotReturn"
                 class="mb-4 rounded-2xl border border-rose-400/35 bg-rose-400/10 px-4 py-3 text-sm text-rose-50"
@@ -281,6 +251,37 @@ const submit = (): void => {
                 class="mb-4 rounded-2xl border border-emerald-400/35 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-50"
             >
                 {{ page.props.flash.success }}
+            </div>
+
+             <div class="mb-4 flex flex-wrap gap-2 sm:mb-5">
+                <!-- <span
+                    class="rounded-full border px-3 py-1 text-[11px] font-semibold tracking-[0.16em] uppercase"
+                    :class="
+                        hasHotspotReturn
+                            ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-100'
+                            : 'border-rose-300/30 bg-rose-400/10 text-rose-100'
+                    "
+                >
+                    {{ hasHotspotReturn ? 'Portal ready' : 'Portal missing' }}
+                </span> -->
+                <span
+                    v-if="selectedPlan"
+                    class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-white uppercase"
+                >
+                    {{ selectedPlan.name?.replaceAll('_',' ') }}
+                </span>
+                <span
+                    v-if="hasValidPhone"
+                    class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-white uppercase"
+                >
+                    {{ phonePreview }}
+                </span>
+                <span
+                    v-if="selectedGatewayMeta"
+                    class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-white uppercase"
+                >
+                    {{ selectedGatewayMeta.label }}
+                </span>
             </div>
 
             <div class="mb-4 grid grid-cols-3 gap-2 sm:mb-5">
@@ -307,13 +308,13 @@ const submit = (): void => {
             </div>
 
             <section
-                class="rounded-[28px] border border-white/10 bg-slate-950/60 p-4 shadow-[0_22px_70px_rgba(2,6,23,0.45)] backdrop-blur sm:p-5"
+                class="rounded-[28px] border border-white/10 bg-white/50 p-4 shadow-[0_22px_70px_rgba(2,6,23,0.45)] backdrop-blur sm:p-5"
             >
                 <div v-if="currentStage === 1" class="space-y-3">
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <p
-                                class="text-[11px] font-semibold tracking-[0.22em] text-slate-400 uppercase"
+                                class="text-[11px] font-semibold tracking-[0.22em] text-black uppercase"
                             >
                                 Step 1
                             </p>
@@ -334,23 +335,23 @@ const submit = (): void => {
                         v-for="plan in props.plans"
                         :key="plan.id"
                         type="button"
-                        class="w-full rounded-[24px] border p-4 text-left transition"
+                        class="w-full rounded-[24px] border p-4 text-left bg-white transition shadow-2xl"
                         :class="
                             selectedPlanType === plan.plan_type
                                 ? 'border-cyan-300/70 bg-cyan-400/12'
-                                : 'border-white/10 bg-white/5 hover:border-cyan-300/40'
+                                : 'border-white/10 bg-white hover:border-cyan-300/40'
                         "
                         @click="selectPlan(plan)"
                     >
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0 flex-1">
-                                <p class="text-sm font-semibold text-white">
-                                    {{ plan.name }}
+                                <p class="text-sm font-semibold text-slate-950/60">
+                                    {{ plan.name.replaceAll('_',' ') }}
                                 </p>
                                 <p
                                     class="mt-2 flex items-center gap-2 text-sm text-slate-300"
                                 >
-                                    <Clock3 class="h-4 w-4 text-cyan-200" />
+                                    <Clock3 class="h-4 w-4 text-slate-950/60" />
                                     {{ planDuration(plan) }}
                                 </p>
                             </div>
@@ -383,7 +384,7 @@ const submit = (): void => {
                             </button>
                             <div>
                                 <p
-                                    class="text-[11px] font-semibold tracking-[0.22em] text-slate-400 uppercase"
+                                    class="text-[11px] font-semibold tracking-[0.22em] text-black uppercase"
                                 >
                                     Step 2
                                 </p>
@@ -414,17 +415,14 @@ const submit = (): void => {
                     </div>
 
                     <div
-                        class="rounded-[24px] border border-white/10 bg-white/5 p-4"
+                        class="rounded-[24px] border border-white/10 bg-white p-4"
                     >
                         <div class="flex items-center justify-between gap-3">
                             <div>
                                 <p
-                                    class="text-[11px] font-semibold tracking-[0.22em] text-slate-400 uppercase"
+                                    class="text-[11px] font-semibold tracking-[0.22em] text-black uppercase"
                                 >
                                     Phone number
-                                </p>
-                                <p class="mt-1 text-xs text-slate-400">
-                                    Hotspot login number
                                 </p>
                             </div>
                             <Smartphone class="h-5 w-5 text-cyan-200" />
@@ -435,7 +433,7 @@ const submit = (): void => {
                             type="tel"
                             autocomplete="tel"
                             placeholder="+2348012345678"
-                            class="mt-4 h-12 w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 text-sm text-white transition outline-none placeholder:text-slate-500 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-500/30"
+                            class="mt-4 h-12 shadow-xl w-full rounded-2xl border border-slate-950/60 px-4 text-sm text-white transition outline-none placeholder:text-slate-500 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-500/30"
                         />
 
                         <p
@@ -482,7 +480,7 @@ const submit = (): void => {
                             </button>
                             <div>
                                 <p
-                                    class="text-[11px] font-semibold tracking-[0.22em] text-slate-400 uppercase"
+                                    class="text-[11px] font-semibold tracking-[0.22em] text-black uppercase"
                                 >
                                     Step 3
                                 </p>
@@ -503,8 +501,8 @@ const submit = (): void => {
                         class="w-full rounded-[24px] border p-4 text-left transition"
                         :class="
                             selectedGateway === gateway
-                                ? 'border-amber-300/60 bg-amber-400/10'
-                                : 'border-white/10 bg-white/5 hover:border-amber-300/35'
+                                ? 'border-amber-300 bg-amber-400'
+                                : 'border-white/90 bg-white hover:border-amber-300/35'
                         "
                         @click="selectGateway(gateway)"
                     >
@@ -512,24 +510,25 @@ const submit = (): void => {
                             <div class="min-w-0 flex-1">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <p
-                                        class="text-base font-semibold text-white"
+                                        class="text-base font-semibold text-black"
                                     >
+                                    Pay With
                                         {{
                                             gatewayDetails[gateway]?.label ??
                                             gateway
                                         }}
                                     </p>
-                                    <span
+                                    <!-- <span
                                         class="rounded-full border border-white/10 bg-slate-950/35 px-2.5 py-1 text-[11px] font-semibold tracking-[0.16em] text-slate-300 uppercase"
                                     >
                                         {{
                                             gatewayDetails[gateway]?.badge ??
                                             'Checkout'
                                         }}
-                                    </span>
+                                    </span> -->
                                 </div>
 
-                                <div class="mt-3 flex flex-wrap gap-2">
+                                <!-- <div class="mt-3 flex flex-wrap gap-2">
                                     <span
                                         v-for="method in gatewayDetails[gateway]
                                             ?.methods ?? ['Secure pay']"
@@ -538,7 +537,7 @@ const submit = (): void => {
                                     >
                                         {{ method }}
                                     </span>
-                                </div>
+                                </div> -->
                             </div>
 
                             <div
