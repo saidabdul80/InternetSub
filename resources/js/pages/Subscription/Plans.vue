@@ -433,7 +433,7 @@ const submit = (): void => {
                             type="tel"
                             autocomplete="tel"
                             placeholder="+2348012345678"
-                            class="mt-4 h-12 shadow-xl w-full rounded-2xl border border-slate-950/60 px-4 text-sm text-white transition outline-none placeholder:text-slate-500 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-500/30"
+                            class="mt-4 h-12 shadow-xl w-full rounded-2xl border border-slate-950/60 px-4 text-sm text-black transition outline-none placeholder:text-slate-500 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-500/30"
                         />
 
                         <p
