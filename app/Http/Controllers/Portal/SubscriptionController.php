@@ -49,6 +49,7 @@ class SubscriptionController extends Controller
         $hotspotReturn = $request->string('hotspot_return')->trim()->toString();
         $hotspotDst = $request->string('hotspot_dst')->trim()->toString();
         $phoneNumber = $this->normalizeNigerianPhone($request->string('phone_number')->toString());
+        $isRenewal = $request->boolean('renew');
         $callbackUrl = route('portal.callback', ['gateway' => $gateway]);
 
         if ($hotspotReturn === '') {
@@ -57,7 +58,7 @@ class SubscriptionController extends Controller
 
         $activeUser = $this->findActiveMikrotikUser($phoneNumber);
 
-        if ($activeUser) {
+        if ($activeUser && ! $isRenewal) {
             $loginUrl = $this->buildHotspotLoginUrl($hotspotReturn, $hotspotDst, $phoneNumber, $phoneNumber);
 
             return $this->redirectToExternal($request, $loginUrl);

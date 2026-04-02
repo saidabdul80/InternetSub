@@ -17,6 +17,7 @@ class StartSubscriptionRequest extends FormRequest
             'plan_type' => ['required', 'integer', 'exists:plans,plan_type'],
             'gateway' => ['required', 'string', 'in:paystack,monnify'],
             'phone_number' => ['required', 'string', 'max:20', 'regex:/^\\+?\\d{8,20}$/'],
+            'renew' => ['nullable', 'boolean'],
             'hotspot_return' => ['required', 'string', 'max:2048'],
             'hotspot_dst' => ['nullable', 'string', 'max:2048'],
         ];

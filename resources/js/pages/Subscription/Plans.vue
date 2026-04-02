@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm, usePage } from '@inertiajs/vue3';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     ArrowLeft,
     ArrowRight,
@@ -74,6 +75,7 @@ const form = useForm({
     phone_number: props.hotspot.phone || '',
     plan_type: 0,
     gateway: '',
+    renew: false,
     hotspot_return: props.hotspot.return_url || '',
     hotspot_dst: props.hotspot.dst || '',
 });
@@ -457,6 +459,23 @@ const submit = (): void => {
                         </p>
                     </div>
 
+                    <label
+                        class="flex items-start gap-3 rounded-[24px] border border-amber-300/25 bg-amber-300/10 px-4 py-4 text-sm text-slate-200"
+                    >
+                        <Checkbox
+                            v-model:checked="form.renew"
+                            class="mt-0.5 border-white/30 data-[state=checked]:border-amber-300 data-[state=checked]:bg-amber-300 data-[state=checked]:text-slate-950"
+                        />
+                        <span class="space-y-1">
+                            <span class="block font-semibold text-white">
+                                Renew this phone number
+                            </span>
+                            <span class="block text-xs text-slate-300">
+                                Use this if the old plan is already exhausted on MikroTik but the app still treats the number as active.
+                            </span>
+                        </span>
+                    </label>
+
                     <button
                         type="button"
                         :disabled="!hasValidPhone"
@@ -589,6 +608,14 @@ const submit = (): void => {
                                     class="truncate pl-4 font-semibold text-white"
                                 >
                                     {{ phonePreview }}
+                                </span>
+                            </div>
+                            <div
+                                class="flex items-center justify-between rounded-2xl bg-slate-950/45 px-4 py-3"
+                            >
+                                <span>Renew</span>
+                                <span class="pl-4 font-semibold text-white">
+                                    {{ form.renew ? 'Yes' : 'No' }}
                                 </span>
                             </div>
                         </div>

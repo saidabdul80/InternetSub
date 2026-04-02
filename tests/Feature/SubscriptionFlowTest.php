@@ -63,6 +63,65 @@ test('subscription start skips payment when phone has active mikrotik user', fun
     expect(Payment::query()->count())->toBe(0);
 });
 
+test('subscription start allows renewal payment when phone has active mikrotik user', function () {
+    config([
+        'services.paystack.secret_key' => 'test-secret',
+        'services.paystack.base_url' => 'https://api.paystack.co',
+        'services.paystack.default_email' => 'guest@example.com',
+        'services.paystack.channels' => ['card', 'bank', 'ussd', 'bank_transfer', 'qr'],
+    ]);
+
+    Plan::factory()->create([
+        'plan_type' => 2,
+        'name' => '24 Hours Unlimited Access',
+        'amount' => 20000,
+        'currency' => 'NGN',
+    ]);
+
+    MikrotikUser::query()->create([
+        'phone_number' => '08012345678',
+        'username' => '08012345678',
+        'profile' => '24-hours',
+        'plan_type' => 2,
+        'status' => 'active',
+        'activated_at' => now()->subHour(),
+        'expires_at' => now()->addHours(12),
+        'last_synced_at' => now(),
+    ]);
+
+    Http::fake([
+        'https://api.paystack.co/transaction/initialize' => Http::response([
+            'status' => true,
+            'data' => [
+                'authorization_url' => 'https://paystack.test/authorize-renew',
+                'reference' => 'ps_ref_renew_123',
+            ],
+        ]),
+    ]);
+
+    $response = $this->post('/app/start', [
+        'plan_type' => 2,
+        'gateway' => 'paystack',
+        'phone_number' => '08012345678',
+        'renew' => true,
+        'hotspot_return' => 'https://hotspot.test/login',
+        'hotspot_dst' => 'https://example.com',
+    ]);
+
+    $response->assertRedirect('https://paystack.test/authorize-renew');
+
+    Http::assertSent(function ($request): bool {
+        return $request->url() === 'https://api.paystack.co/transaction/initialize'
+            && data_get($request->data(), 'metadata.phone_number') === '08012345678';
+    });
+
+    $payment = Payment::query()->latest('id')->first();
+
+    expect($payment)->not->toBeNull()
+        ->and($payment?->status)->toBe('pending')
+        ->and($payment?->phone_number)->toBe('08012345678');
+});
+
 test('subscription start initializes paystack with configured checkout channels', function () {
     config([
         'services.paystack.secret_key' => 'test-secret',
