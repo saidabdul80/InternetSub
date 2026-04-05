@@ -3,16 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\MikrotikUser;
 use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Voucher;
 use App\Services\GatewayFactory;
+use App\Services\MikrotikService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Throwable;
 
 class PaymentController extends Controller
 {
@@ -57,8 +60,11 @@ class PaymentController extends Controller
         return back()->with('success', 'Payment marked as fulfilled.');
     }
 
-    public function purchase(Request $request, GatewayFactory $gatewayFactory): RedirectResponse
-    {
+    public function purchase(
+        Request $request,
+        GatewayFactory $gatewayFactory,
+        MikrotikService $mikrotikService
+    ): RedirectResponse {
         $data = $request->validate([
             'phone_number' => ['required', 'string', 'max:20', 'regex:/^\\+?\\d{8,20}$/'],
             'plan_type' => ['required', 'integer', 'exists:plans,plan_type'],
@@ -67,6 +73,7 @@ class PaymentController extends Controller
         ]);
 
         $plan = Plan::query()->where('plan_type', $data['plan_type'])->firstOrFail();
+        $phoneNumber = $this->normalizeNigerianPhone($data['phone_number']);
         $reservationWindow = Carbon::now()->subMinutes(15);
         $accessPoint = route('admin.vouchers.index');
         $callbackUrl = route('api.callback');
@@ -74,10 +81,21 @@ class PaymentController extends Controller
 
         if ($data['payment_method'] === 'manual') {
             $payment = null;
-            $voucher = null;
+            $profile = $mikrotikService->profileForPlan((int) $plan->plan_type);
+            $expiresAt = $this->calculatePlanExpiry((int) $plan->plan_type);
 
             try {
-                DB::transaction(function () use ($plan, $reference, $accessPoint, $callbackUrl, $data, $reservationWindow, &$payment, &$voucher): void {
+                DB::transaction(function () use (
+                    $plan,
+                    $reference,
+                    $accessPoint,
+                    $callbackUrl,
+                    $phoneNumber,
+                    $profile,
+                    $expiresAt,
+                    $mikrotikService,
+                    &$payment
+                ): void {
                     $payment = Payment::query()->create([
                         'plan_id' => $plan->id,
                         'plan_type' => $plan->plan_type,
@@ -86,52 +104,51 @@ class PaymentController extends Controller
                         'currency' => $plan->currency,
                         'access_point' => $accessPoint,
                         'callback_url' => $callbackUrl,
-                        'phone_number' => $data['phone_number'],
+                        'phone_number' => $phoneNumber,
                         'status' => 'paid',
                         'paid_at' => now(),
                         'gateway' => 'manual',
                     ]);
 
-                    $voucher = Voucher::query()
-                        ->where('plan_type', $plan->plan_type)
-                        ->where(function ($query) use ($reservationWindow): void {
-                            $query->where('status', 'available')
-                                ->orWhere(function ($innerQuery) use ($reservationWindow): void {
-                                    $innerQuery->where('status', 'reserved')
-                                        ->where('reserved_at', '<=', $reservationWindow);
-                                });
-                        })
-                        ->lockForUpdate()
-                        ->first();
+                    $mikrotikService->provisionAccessUser(
+                        $phoneNumber,
+                        $phoneNumber,
+                        $profile,
+                        'Admin manual activation '.$payment->reference,
+                        (int) $plan->plan_type
+                    );
 
-                    if (! $voucher) {
-                        throw new RuntimeException('no_voucher_available');
-                    }
-
-                    $voucher->update([
-                        'status' => 'used',
-                        'payment_id' => $payment->id,
-                        'reserved_at' => null,
-                        'used_at' => now(),
-                    ]);
+                    MikrotikUser::query()->updateOrCreate(
+                        ['phone_number' => $phoneNumber],
+                        [
+                            'username' => $phoneNumber,
+                            'profile' => $profile,
+                            'plan_type' => $plan->plan_type,
+                            'status' => 'active',
+                            'payment_id' => $payment->id,
+                            'activated_at' => now(),
+                            'expires_at' => $expiresAt,
+                            'last_synced_at' => now(),
+                        ]
+                    );
 
                     $payment->update([
                         'status' => 'fulfilled',
                     ]);
                 });
-            } catch (RuntimeException $exception) {
-                if ($exception->getMessage() === 'no_voucher_available') {
-                    return back()->with('error', 'No vouchers available for this plan.');
+            } catch (Throwable $exception) {
+                report($exception);
+
+                if ($payment) {
+                    $payment->update([
+                        'status' => 'failed',
+                    ]);
                 }
 
-                throw $exception;
+                return back()->with('error', 'Direct activation failed. Please check MikroTik connectivity and plan mapping.');
             }
 
-            if (! $voucher) {
-                return back()->with('error', 'No vouchers available for this plan.');
-            }
-
-            return back()->with('success', 'Voucher assigned: '.$voucher->code);
+            return back()->with('success', 'Phone number activated: '.$phoneNumber);
         }
 
         $payment = null;
@@ -140,7 +157,7 @@ class PaymentController extends Controller
         $gatewayClient = $gatewayFactory->create($gateway);
 
         try {
-            DB::transaction(function () use ($plan, $reference, $accessPoint, $callbackUrl, $data, $reservationWindow, &$payment, &$voucher, $gateway): void {
+            DB::transaction(function () use ($plan, $reference, $accessPoint, $callbackUrl, $phoneNumber, $reservationWindow, &$payment, &$voucher, $gateway): void {
                 $payment = Payment::query()->create([
                     'plan_id' => $plan->id,
                     'plan_type' => $plan->plan_type,
@@ -149,7 +166,7 @@ class PaymentController extends Controller
                     'currency' => $plan->currency,
                     'access_point' => $accessPoint,
                     'callback_url' => $callbackUrl,
-                    'phone_number' => $data['phone_number'],
+                    'phone_number' => $phoneNumber,
                     'status' => 'pending',
                     'gateway' => $gateway,
                 ]);
@@ -196,7 +213,7 @@ class PaymentController extends Controller
                     'payment_id' => $payment->id,
                     'plan_type' => $plan->plan_type,
                     'access_point' => $accessPoint,
-                    'phone_number' => $data['phone_number'],
+                    'phone_number' => $phoneNumber,
                 ],
             ]);
         } catch (RuntimeException $exception) {
@@ -235,5 +252,39 @@ class PaymentController extends Controller
         }
 
         return redirect()->away($authorizationUrl);
+    }
+
+    protected function normalizeNigerianPhone(string $phone): string
+    {
+        $normalized = preg_replace('/\D+/', '', $phone) ?? '';
+
+        if (str_starts_with($normalized, '234')) {
+            $normalized = substr($normalized, 3);
+        }
+
+        if (! str_starts_with($normalized, '0')) {
+            $normalized = '0'.$normalized;
+        }
+
+        return $normalized;
+    }
+
+    protected function calculatePlanExpiry(int $planType): ?Carbon
+    {
+        $durationMap = (array) config('services.mikrotik.plan_duration_hours', []);
+
+        $durationHours = null;
+
+        if (array_key_exists((string) $planType, $durationMap)) {
+            $durationHours = (int) $durationMap[(string) $planType];
+        } elseif (array_key_exists($planType, $durationMap)) {
+            $durationHours = (int) $durationMap[$planType];
+        }
+
+        if ($durationHours === null || $durationHours <= 0) {
+            return null;
+        }
+
+        return Carbon::now()->addHours($durationHours);
     }
 }

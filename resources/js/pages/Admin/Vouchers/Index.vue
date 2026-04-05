@@ -333,9 +333,9 @@ const submitClear = () => {
             <!-- Manual Purchase Section -->
             <div class="rounded-2xl border bg-card p-6 shadow-sm">
                 <div class="mb-6">
-                    <h2 class="text-xl font-semibold">Manual Purchase</h2>
+                    <h2 class="text-xl font-semibold">Manual Activation</h2>
                     <p class="mt-1 text-sm text-muted-foreground">
-                        Create a voucher purchase for a phone number (manual or Paystack).
+                        Activate a phone number directly or send the customer to gateway checkout.
                     </p>
                 </div>
 
@@ -382,7 +382,7 @@ const submitClear = () => {
                                 v-model="purchaseForm.payment_method"
                                 class="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
                             >
-                                <option value="manual">Manual (bypass Paystack)</option>
+                                <option value="manual">Manual (direct activation)</option>
                                 <option value="paystack">Paystack</option>
                             </select>
                             <p v-if="purchaseForm.errors.payment_method" class="text-sm text-destructive">
@@ -411,10 +411,10 @@ const submitClear = () => {
                             :disabled="purchaseForm.processing"
                             class="min-w-[160px]"
                         >
-                            {{ purchaseForm.processing ? 'Processing...' : 'Create Purchase' }}
+                            {{ purchaseForm.processing ? 'Processing...' : 'Activate / Create Purchase' }}
                         </Button>
                         <p class="text-sm text-muted-foreground">
-                            Manual assigns a voucher immediately; Paystack redirects to checkout.
+                            Manual activates the phone number immediately; Paystack redirects to checkout.
                         </p>
                     </div>
 
