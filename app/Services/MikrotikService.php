@@ -56,6 +56,10 @@ class MikrotikService
                 }
 
                 $this->command('/ip/hotspot/user/set', $attributes);
+                // 2. IMPORTANT: Reset counters so they can start fresh with the new limit
+                $this->command('/ip/hotspot/user/reset-counters', [
+                    '=.id=' . $userId
+                ]);
 
                 return;
             }
