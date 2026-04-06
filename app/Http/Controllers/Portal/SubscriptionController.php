@@ -59,7 +59,7 @@ class SubscriptionController extends Controller
         $callbackUrl = route('portal.callback', ['gateway' => $gateway]);
         $redirectToMemberDashboard = $this->shouldRedirectToMemberDashboard($hotspotReturn);
 
-        $activeUser = $this->findActiveMikrotikUser($phoneNumber);
+        $activeUser = $this->findActiveMikrotikUser($phoneNumber, $mikrotikService);
 
         if ($activeUser && ! $isRenewal) {
             $customer = $this->ensureMemberCustomerForPhone($phoneNumber);
@@ -317,17 +317,46 @@ class SubscriptionController extends Controller
         return null;
     }
 
-    protected function findActiveMikrotikUser(string $phoneNumber): ?MikrotikUser
+    protected function findActiveMikrotikUser(string $phoneNumber, MikrotikService $mikrotikService): ?MikrotikUser
     {
-        return MikrotikUser::query()
+        $mikrotikUser = MikrotikUser::query()
             ->where('phone_number', $phoneNumber)
-            ->where('status', 'active')
-            ->where(function ($query): void {
-                $query->whereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
-            })
             ->latest()
             ->first();
+
+        if (! $mikrotikUser) {
+            return null;
+        }
+
+        try {
+            $routerStatus = $mikrotikService->getHotspotUserUsageStatus($phoneNumber);
+
+            if ($routerStatus !== null) {
+                $isActive = (bool) ($routerStatus['exists'] ?? false) && (bool) ($routerStatus['active'] ?? false);
+
+                $mikrotikUser->forceFill([
+                    'status' => $isActive ? 'active' : 'inactive',
+                    'last_synced_at' => now(),
+                ])->save();
+
+                return $isActive ? $mikrotikUser : null;
+            }
+        } catch (Throwable $exception) {
+            Log::warning('Failed to confirm MikroTik hotspot user status from router.', [
+                'phone_number' => $phoneNumber,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+
+        if ($mikrotikUser->status !== 'active') {
+            return null;
+        }
+
+        if ($mikrotikUser->expires_at !== null && $mikrotikUser->expires_at->isPast()) {
+            return null;
+        }
+
+        return $mikrotikUser;
     }
 
     protected function buildHotspotLoginUrl(string $hotspotReturn, string $hotspotDst, string $username, string $password): string

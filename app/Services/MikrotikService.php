@@ -10,6 +10,91 @@ class MikrotikService
     private $socket = null;
     private ?string $lastCommand = null;
 
+    /**
+     * @return array{
+     *     exists: bool,
+     *     active: bool,
+     *     exhausted: bool,
+     *     limit_uptime_reached: bool,
+     *     limit_bytes_total_reached: bool,
+     *     disabled: bool,
+     *     uptime_seconds: int,
+     *     limit_uptime_seconds: ?int,
+     *     bytes_in: int,
+     *     bytes_out: int,
+     *     bytes_total: int,
+     *     limit_bytes_total: ?int,
+     *     attributes: array<string, string>
+     * }|null
+     */
+    public function getHotspotUserUsageStatus(string $username): ?array
+    {
+        $provisioner = strtolower((string) config('services.mikrotik.provisioner', 'hotspot'));
+
+        if ($provisioner === 'userman') {
+            return null;
+        }
+
+        $this->connect();
+
+        try {
+            $attributes = $this->findHotspotUserAttributesByName($username);
+
+            if ($attributes === null) {
+                return [
+                    'exists' => false,
+                    'active' => false,
+                    'exhausted' => false,
+                    'limit_uptime_reached' => false,
+                    'limit_bytes_total_reached' => false,
+                    'disabled' => false,
+                    'uptime_seconds' => 0,
+                    'limit_uptime_seconds' => null,
+                    'bytes_in' => 0,
+                    'bytes_out' => 0,
+                    'bytes_total' => 0,
+                    'limit_bytes_total' => null,
+                    'attributes' => [],
+                ];
+            }
+
+            $disabled = strtolower((string) ($attributes['disabled'] ?? 'no')) === 'yes';
+            $uptimeSeconds = $this->parseRouterOsDurationToSeconds((string) ($attributes['uptime'] ?? '0'));
+            $limitUptimeRaw = trim((string) ($attributes['limit-uptime'] ?? ''));
+            $limitUptimeSeconds = $this->isUnlimitedRouterOsDurationLimit($limitUptimeRaw)
+                ? null
+                : $this->parseRouterOsDurationToSeconds($limitUptimeRaw);
+            $limitUptimeReached = $limitUptimeSeconds !== null && $uptimeSeconds >= $limitUptimeSeconds;
+
+            $bytesIn = $this->parseRouterOsInteger($attributes['bytes-in'] ?? null);
+            $bytesOut = $this->parseRouterOsInteger($attributes['bytes-out'] ?? null);
+            $bytesTotal = $bytesIn + $bytesOut;
+            $limitBytesTotal = $this->parseRouterOsInteger($attributes['limit-bytes-total'] ?? null);
+            $hasBytesLimit = $limitBytesTotal > 0;
+            $limitBytesTotalReached = $hasBytesLimit && $bytesTotal >= $limitBytesTotal;
+
+            $exhausted = $limitUptimeReached || $limitBytesTotalReached;
+
+            return [
+                'exists' => true,
+                'active' => ! $disabled && ! $exhausted,
+                'exhausted' => $exhausted,
+                'limit_uptime_reached' => $limitUptimeReached,
+                'limit_bytes_total_reached' => $limitBytesTotalReached,
+                'disabled' => $disabled,
+                'uptime_seconds' => $uptimeSeconds,
+                'limit_uptime_seconds' => $limitUptimeSeconds,
+                'bytes_in' => $bytesIn,
+                'bytes_out' => $bytesOut,
+                'bytes_total' => $bytesTotal,
+                'limit_bytes_total' => $hasBytesLimit ? $limitBytesTotal : null,
+                'attributes' => $attributes,
+            ];
+        } finally {
+            $this->disconnect();
+        }
+    }
+
     public function provisionAccessUser(
         string $username,
         string $password,
@@ -239,6 +324,22 @@ class MikrotikService
 
     private function findHotspotUserIdByName(string $username): ?string
     {
+        $attributes = $this->findHotspotUserAttributesByName($username);
+
+        if ($attributes === null) {
+            return null;
+        }
+
+        $id = $attributes['.id'] ?? null;
+
+        return is_string($id) && $id !== '' ? $id : null;
+    }
+
+    /**
+     * @return array<string, string>|null
+     */
+    private function findHotspotUserAttributesByName(string $username): ?array
+    {
         $replies = $this->command('/ip/hotspot/user/print', [
             '?name='.$username,
         ]);
@@ -249,11 +350,12 @@ class MikrotikService
             }
 
             $attributes = $reply['attributes'] ?? [];
-            $id = $attributes['.id'] ?? null;
 
-            if (is_string($id) && $id !== '') {
-                return $id;
+            if (($attributes['name'] ?? null) !== $username) {
+                continue;
             }
+
+            return $attributes;
         }
 
         return null;
@@ -660,5 +762,65 @@ class MikrotikService
         }
 
         return null;
+    }
+
+    private function parseRouterOsInteger(mixed $value): int
+    {
+        $normalized = trim((string) $value);
+
+        if ($normalized === '' || ! ctype_digit($normalized)) {
+            return 0;
+        }
+
+        return (int) $normalized;
+    }
+
+    private function isUnlimitedRouterOsDurationLimit(string $value): bool
+    {
+        $normalized = strtolower(trim($value));
+
+        return $normalized === ''
+            || $normalized === '0'
+            || $normalized === '00:00:00'
+            || preg_match('/^0+(w|d|h|m|s)?$/', $normalized) === 1;
+    }
+
+    private function parseRouterOsDurationToSeconds(string $value): int
+    {
+        $normalized = strtolower(trim($value));
+
+        if ($normalized === '' || $normalized === '0' || $normalized === '00:00:00') {
+            return 0;
+        }
+
+        if (preg_match('/^\d+:\d{2}:\d{2}$/', $normalized) === 1) {
+            [$hours, $minutes, $seconds] = array_map('intval', explode(':', $normalized));
+
+            return ($hours * 3600) + ($minutes * 60) + $seconds;
+        }
+
+        $seconds = 0;
+
+        if (preg_match_all('/(\d+)(w|d|h|m|s)/', $normalized, $matches, PREG_SET_ORDER) > 0) {
+            foreach ($matches as $match) {
+                $amount = (int) $match[1];
+
+                $seconds += match ($match[2]) {
+                    'w' => $amount * 604800,
+                    'd' => $amount * 86400,
+                    'h' => $amount * 3600,
+                    'm' => $amount * 60,
+                    's' => $amount,
+                    default => 0,
+                };
+            }
+        }
+
+        if (preg_match('/(\d+:\d{2}:\d{2})$/', $normalized, $clockMatch) === 1) {
+            [$hours, $minutes, $clockSeconds] = array_map('intval', explode(':', $clockMatch[1]));
+            $seconds += ($hours * 3600) + ($minutes * 60) + $clockSeconds;
+        }
+
+        return $seconds;
     }
 }

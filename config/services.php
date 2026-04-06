@@ -79,7 +79,7 @@ return [
                 'limit_bytes_total' => env('MIKROTIK_HOTSPOT_PLAN_1_BYTES_TOTAL', '5368709120'),
             ],
             2 => [
-                'limit_uptime' => env('MIKROTIK_HOTSPOT_PLAN_2_UPTIME', '3d'),
+                'limit_uptime' => env('MIKROTIK_HOTSPOT_PLAN_2_UPTIME', '1d'),
                 'limit_bytes_total' => env('MIKROTIK_HOTSPOT_PLAN_2_BYTES_TOTAL', '10737418240'),
             ],
             3 => [
