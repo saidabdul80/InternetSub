@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     ArrowLeft,
@@ -95,6 +95,8 @@ const hasHotspotReturn = computed<boolean>(
     () => form.hotspot_return.trim().length > 0,
 );
 
+const isDirectPurchase = computed<boolean>(() => !hasHotspotReturn.value);
+
 const hasValidPhone = computed<boolean>(() => {
     const cleaned = form.phone_number.replace(/\s+/g, '');
     return /^\+?\d{8,20}$/.test(cleaned);
@@ -102,7 +104,6 @@ const hasValidPhone = computed<boolean>(() => {
 
 const canSubmit = computed<boolean>(() => {
     return (
-        hasHotspotReturn.value &&
         hasValidPhone.value &&
         selectedPlan.value !== null &&
         selectedGateway.value.trim().length > 0 &&
@@ -222,6 +223,14 @@ const submit = (): void => {
                 >
                     GoodNews Wi-Fi
                 </p>
+                <div class="mb-4 flex justify-center">
+                    <Link
+                        href="/member/login"
+                        class="rounded-full border border-white/15 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-200 transition hover:bg-white/10"
+                    >
+                        Member Login
+                    </Link>
+                </div>
                 <h1
                     class="mt-2 text-2xl font-bold text-white sm:text-4xl"
                     style="font-family: 'Bricolage Grotesque', sans-serif"
@@ -229,17 +238,28 @@ const submit = (): void => {
                     Fast mobile checkout
                 </h1>
                 <p class="mt-2 text-sm text-slate-300">
-                    Pick a plan and continue.
+                    {{
+                        isDirectPurchase
+                            ? 'Pick a plan, pay, then continue from your member dashboard.'
+                            : 'Pick a plan and continue.'
+                    }}
                 </p>
+                <div class="mt-4 flex flex-wrap justify-center gap-3">
+                    <a
+                        href="/GoonewsApp.apk"
+                        download="GoonewsApp.apk"
+                        class="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-400/20"
+                    >
+                        Download App
+                    </a>
+                    <a
+                        href="tel:+2347035398873"
+                        class="rounded-full border border-white/15 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-200 transition hover:bg-white/10"
+                    >
+                        Contact Us: +234 703 539 8873
+                    </a>
+                </div>
             </header>
-
-           
-            <div
-                v-if="!hasHotspotReturn"
-                class="mb-4 rounded-2xl border border-rose-400/35 bg-rose-400/10 px-4 py-3 text-sm text-rose-50"
-            >
-                Open this page from the hotspot subscribe button.
-            </div>
 
             <div
                 v-if="page.props.flash?.error"
@@ -255,7 +275,7 @@ const submit = (): void => {
                 {{ page.props.flash.success }}
             </div>
 
-             <div class="mb-4 flex flex-wrap gap-2 sm:mb-5">
+            <div class="mb-4 flex flex-wrap gap-2 sm:mb-5">
                 <!-- <span
                     class="rounded-full border px-3 py-1 text-[11px] font-semibold tracking-[0.16em] uppercase"
                     :class="
@@ -618,6 +638,15 @@ const submit = (): void => {
                                     {{ form.renew ? 'Yes' : 'No' }}
                                 </span>
                             </div>
+                            <div
+                                v-if="isDirectPurchase"
+                                class="flex items-center justify-between rounded-2xl bg-slate-950/45 px-4 py-3"
+                            >
+                                <span>After payment</span>
+                                <span class="pl-4 font-semibold text-white">
+                                    Member dashboard
+                                </span>
+                            </div>
                         </div>
                     </div>
 
@@ -637,6 +666,16 @@ const submit = (): void => {
                     </button>
                 </form>
             </section>
+
+            <div class="mt-4 text-center text-xs text-slate-400">
+                Need help? Call
+                <a
+                    href="tel:+2347035398873"
+                    class="font-semibold text-cyan-200 hover:text-cyan-100"
+                >
+                    +234 703 539 8873
+                </a>
+            </div>
         </div>
     </div>
 </template>

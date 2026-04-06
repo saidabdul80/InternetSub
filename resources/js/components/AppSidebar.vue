@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Ticket } from 'lucide-vue-next';
+import { Activity, BookOpen, Folder, LayoutGrid, Router, Ticket, Users, Wallet } from 'lucide-vue-next';
 
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -30,6 +30,26 @@ const mainNavItems: NavItem[] = [
         title: 'Vouchers',
         href: adminVouchersIndex(),
         icon: Ticket,
+    },
+    {
+        title: 'Customers',
+        href: '/admin/customers',
+        icon: Users,
+    },
+    {
+        title: 'Routers',
+        href: '/admin/routers',
+        icon: Router,
+    },
+    {
+        title: 'Recharges',
+        href: '/admin/recharges',
+        icon: Activity,
+    },
+    {
+        title: 'Transactions',
+        href: '/admin/transactions',
+        icon: Wallet,
     },
 ];
 

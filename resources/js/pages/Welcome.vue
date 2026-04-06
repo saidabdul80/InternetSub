@@ -49,10 +49,17 @@ withDefaults(
                     </Link>
                     <Link
                         v-else
+                        href="/member/login"
+                        class="rounded-full border border-[#b6e2da] px-4 py-2 text-xs font-semibold uppercase tracking-widest text-[#b6e2da] transition hover:bg-[#b6e2da] hover:text-[#0f1a1c]"
+                    >
+                        Member Login
+                    </Link>
+                    <Link
+                        v-if="!$page.props.auth.user"
                         :href="login()"
                         class="rounded-full border border-transparent bg-[#f6f3ee] px-4 py-2 text-xs font-semibold uppercase tracking-widest text-[#0f1a1c] transition hover:bg-[#efe7dd]"
                     >
-                        Log in
+                        Admin Login
                     </Link>
                 </nav>
             </header>
@@ -84,8 +91,15 @@ withDefaults(
                         </Link>
                         <Link
                             v-else
-                            :href="login()"
+                            href="/member/login"
                             class="rounded-full border border-[#b6e2da] px-6 py-3 text-xs font-semibold uppercase tracking-widest text-[#b6e2da] transition hover:bg-[#b6e2da] hover:text-[#0f1a1c]"
+                        >
+                            Member Login
+                        </Link>
+                        <Link
+                            v-if="!$page.props.auth.user"
+                            :href="login()"
+                            class="rounded-full border border-[#2b3b3d] px-6 py-3 text-xs font-semibold uppercase tracking-widest text-[#f6f3ee] transition hover:border-[#f6f3ee]"
                         >
                             Admin Login
                         </Link>

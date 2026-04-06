@@ -97,5 +97,6 @@ return [
             3 => (int) env('MIKROTIK_PLAN_3_HOURS', 168),
             4 => (int) env('MIKROTIK_PLAN_4_HOURS', 720),
         ],
+        'login_url' => env('MIKROTIK_LOGIN_URL', 'http://goodnews.net'),
     ],
 ];

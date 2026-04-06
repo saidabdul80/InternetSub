@@ -56,10 +56,11 @@ class MikrotikService
                 }
 
                 $this->command('/ip/hotspot/user/set', $attributes);
-                // 2. IMPORTANT: Reset counters so they can start fresh with the new limit
                 $this->command('/ip/hotspot/user/reset-counters', [
-                    '=.id=' . $userId
+                    '=.id='.$userId,
                 ]);
+                $this->removeHotspotActiveSessions($username);
+                $this->removeHotspotCookies($username);
 
                 return;
             }
@@ -256,6 +257,54 @@ class MikrotikService
         }
 
         return null;
+    }
+
+    private function removeHotspotActiveSessions(string $username): void
+    {
+        $replies = $this->command('/ip/hotspot/active/print', [
+            '?user='.$username,
+        ]);
+
+        foreach ($replies as $reply) {
+            if (($reply['type'] ?? '') !== '!re') {
+                continue;
+            }
+
+            $attributes = $reply['attributes'] ?? [];
+            $id = $attributes['.id'] ?? null;
+
+            if (! is_string($id) || $id === '') {
+                continue;
+            }
+
+            $this->command('/ip/hotspot/active/remove', [
+                '=.id='.$id,
+            ]);
+        }
+    }
+
+    private function removeHotspotCookies(string $username): void
+    {
+        $replies = $this->command('/ip/hotspot/cookie/print', [
+            '?user='.$username,
+        ]);
+
+        foreach ($replies as $reply) {
+            if (($reply['type'] ?? '') !== '!re') {
+                continue;
+            }
+
+            $attributes = $reply['attributes'] ?? [];
+            $id = $attributes['.id'] ?? null;
+
+            if (! is_string($id) || $id === '') {
+                continue;
+            }
+
+            $this->command('/ip/hotspot/cookie/remove', [
+                '=.id='.$id,
+            ]);
+        }
     }
 
     private function findUserManagerUserIdByUsername(string $username): ?string

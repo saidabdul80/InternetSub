@@ -1,9 +1,20 @@
 <?php
 
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\CustomerController;
+use App\Http\Controllers\Admin\RechargeController;
+use App\Http\Controllers\Admin\RouterController;
+use App\Http\Controllers\Admin\TransactionController;
 use App\Http\Controllers\Admin\VoucherController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Member\AuthController as MemberAuthController;
+use App\Http\Controllers\Member\DashboardController as MemberDashboardController;
+use App\Http\Controllers\Member\MessageController as MemberMessageController;
+use App\Http\Controllers\Member\OrderController as MemberOrderController;
+use App\Http\Controllers\Member\PackageController as MemberPackageController;
+use App\Http\Controllers\Member\ProfileController as MemberProfileController;
 use App\Http\Controllers\Portal\SubscriptionController;
+use App\Http\Middleware\EnsureCustomerIsAuthenticated;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -32,6 +43,16 @@ Route::middleware('auth')
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
+        Route::get('customers', [CustomerController::class, 'index'])->name('customers.index');
+        Route::post('customers', [CustomerController::class, 'store'])->name('customers.store');
+        Route::get('customers/{customer}', [CustomerController::class, 'show'])->name('customers.show');
+        Route::put('customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
+        Route::get('routers', [RouterController::class, 'index'])->name('routers.index');
+        Route::post('routers', [RouterController::class, 'store'])->name('routers.store');
+        Route::get('routers/{router}', [RouterController::class, 'show'])->name('routers.show');
+        Route::put('routers/{router}', [RouterController::class, 'update'])->name('routers.update');
+        Route::get('recharges', [RechargeController::class, 'index'])->name('recharges.index');
+        Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
         Route::get('vouchers', [VoucherController::class, 'index'])->name('vouchers.index');
         Route::post('vouchers/upload', [VoucherController::class, 'store'])->name('vouchers.upload');
         Route::post('vouchers/clear', [VoucherController::class, 'clear'])->name('vouchers.clear');
@@ -41,6 +62,24 @@ Route::middleware('auth')
             ->name('payments.fulfill');
         Route::post('payments/purchase', [PaymentController::class, 'purchase'])
             ->name('payments.purchase');
+    });
+
+Route::prefix('member')
+    ->name('member.')
+    ->group(function () {
+        Route::get('login', [MemberAuthController::class, 'create'])->name('login');
+        Route::post('login', [MemberAuthController::class, 'store'])->name('login.store');
+
+        Route::middleware(EnsureCustomerIsAuthenticated::class)->group(function (): void {
+            Route::post('logout', [MemberAuthController::class, 'destroy'])->name('logout');
+            Route::get('/', MemberDashboardController::class)->name('dashboard');
+            Route::get('connect', [MemberDashboardController::class, 'connect'])->name('connect');
+            Route::get('packages', [MemberPackageController::class, 'index'])->name('packages.index');
+            Route::get('messages', [MemberMessageController::class, 'index'])->name('messages.index');
+            Route::get('profile', [MemberProfileController::class, 'edit'])->name('profile.edit');
+            Route::put('profile', [MemberProfileController::class, 'update'])->name('profile.update');
+            Route::get('orders', [MemberOrderController::class, 'index'])->name('orders.index');
+        });
     });
 
 Route::get('send/sms', function () {

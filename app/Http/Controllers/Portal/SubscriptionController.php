@@ -4,15 +4,21 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StartSubscriptionRequest;
+use App\Models\Customer;
 use App\Models\MikrotikUser;
 use App\Models\Payment;
 use App\Models\Plan;
 use App\Services\GatewayFactory;
 use App\Services\MikrotikService;
+use App\Support\HotspotLoginUrl;
+use App\Support\MemberRemember;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -51,17 +57,24 @@ class SubscriptionController extends Controller
         $phoneNumber = $this->normalizeNigerianPhone($request->string('phone_number')->toString());
         $isRenewal = $request->boolean('renew');
         $callbackUrl = route('portal.callback', ['gateway' => $gateway]);
-
-        if ($hotspotReturn === '') {
-            return back()->with('error', 'Missing hotspot return URL.');
-        }
+        $redirectToMemberDashboard = $this->shouldRedirectToMemberDashboard($hotspotReturn);
 
         $activeUser = $this->findActiveMikrotikUser($phoneNumber);
 
         if ($activeUser && ! $isRenewal) {
-            $loginUrl = $this->buildHotspotLoginUrl($hotspotReturn, $hotspotDst, $phoneNumber, $phoneNumber);
+            $customer = $this->ensureMemberCustomerForPhone($phoneNumber);
+            $this->signInMemberCustomer($request, $customer);
 
-            return $this->redirectToExternal($request, $loginUrl);
+            if ($redirectToMemberDashboard) {
+                return redirect()
+                    ->route('member.dashboard')
+                    ->with('success', 'This phone number already has an active plan. Use Connect Internet to go online.');
+            }
+
+            return $this->redirectToExternal(
+                $request,
+                $this->buildHotspotLoginUrl($hotspotReturn, $hotspotDst, $phoneNumber, $phoneNumber)
+            );
         }
 
         $verifiedPendingPayment = $this->verifyLatestPendingPayments($gatewayFactory, $phoneNumber, $planType);
@@ -74,14 +87,19 @@ class SubscriptionController extends Controller
             ]);
 
             try {
-                $loginUrl = $this->finalizePaymentAndCreateHotspotUser($verifiedPendingPayment, $mikrotikService);
+                ['login_url' => $loginUrl, 'customer' => $customer] = $this->finalizePaymentAndCreateHotspotUser($verifiedPendingPayment, $mikrotikService);
             } catch (Throwable $exception) {
                 report($exception);
 
                 return back()->with('error', 'Payment was found but provisioning failed. Please contact support.');
             }
+            try {
+                $this->signInMemberCustomer($request, $customer);
+            } catch (\Exception $e) {
+                Log::error($e);
+            }
 
-            return $this->redirectToExternal($request, $loginUrl);
+            return $this->redirectAfterPurchase($request, $loginUrl, $redirectToMemberDashboard);
         }
 
         $payment = Payment::query()->create([
@@ -189,23 +207,36 @@ class SubscriptionController extends Controller
         }
 
         try {
-            $loginUrl = $this->finalizePaymentAndCreateHotspotUser($payment, $mikrotikService);
+            ['login_url' => $loginUrl, 'customer' => $customer] = $this->finalizePaymentAndCreateHotspotUser($payment, $mikrotikService);
         } catch (Throwable $exception) {
             report($exception);
 
             return $this->redirectWithErrorToSubscriptionPage($payment, 'Payment succeeded but provisioning failed. Please contact support.');
         }
 
-        return redirect()->away($loginUrl);
+        $this->signInMemberCustomer($request, $customer);
+
+        return $this->redirectAfterPurchase(
+            $request,
+            $loginUrl,
+            $this->shouldRedirectToMemberDashboard((string) $payment->access_point)
+        );
     }
 
-    protected function finalizePaymentAndCreateHotspotUser(Payment $payment, MikrotikService $mikrotikService): string
+    protected function finalizePaymentAndCreateHotspotUser(Payment $payment, MikrotikService $mikrotikService): array
     {
         $phoneNumber = $this->normalizeNigerianPhone((string) $payment->phone_number);
         $profile = $mikrotikService->profileForPlan((int) $payment->plan_type);
         $expiresAt = $this->calculatePlanExpiry((int) $payment->plan_type);
+        $customer = null;
   
-        DB::transaction(function () use ($payment, $phoneNumber, $profile, $expiresAt, $mikrotikService): void {
+        DB::transaction(function () use ($payment, $phoneNumber, $profile, $expiresAt, $mikrotikService, &$customer): void {
+            try {
+                $customer = $this->ensureMemberCustomerForPhone($phoneNumber);
+            } catch (\Exception $e) {
+                Log::error($e);
+            }
+
             $mikrotikService->provisionAccessUser(
                 $phoneNumber,
                 $phoneNumber,
@@ -235,12 +266,15 @@ class SubscriptionController extends Controller
             ]);
         });
 
-        return $this->buildHotspotLoginUrl(
-            (string) $payment->access_point,
-            (string) ($payment->hotspot_dst ?? ''),
-            $phoneNumber,
-            $phoneNumber
-        );
+        return [
+            'login_url' => $this->buildHotspotLoginUrl(
+                (string) $payment->access_point,
+                (string) ($payment->hotspot_dst ?? ''),
+                $phoneNumber,
+                $phoneNumber
+            ),
+            'customer' => $customer,
+        ];
     }
 
     protected function verifyLatestPendingPayments(
@@ -298,20 +332,11 @@ class SubscriptionController extends Controller
 
     protected function buildHotspotLoginUrl(string $hotspotReturn, string $hotspotDst, string $username, string $password): string
     {
-        $params = [
-            'username' => $username,
-            'phone' => $username,
-            'password' => $password,
-            'autologin' => 1,
-        ];
+        $baseUrl = trim($hotspotReturn) !== ''
+            ? $hotspotReturn
+            : (string) config('services.mikrotik.login_url');
 
-        if ($hotspotDst !== '') {
-            $params['dst'] = $hotspotDst;
-        }
-
-        $separator = str_contains($hotspotReturn, '?') ? '&' : '?';
-
-        return $hotspotReturn.$separator.http_build_query($params);
+        return HotspotLoginUrl::build($baseUrl, $hotspotDst, $username, $password);
     }
 
     protected function normalizeNigerianPhone(string $phone): string
@@ -352,7 +377,7 @@ class SubscriptionController extends Controller
     {
         return redirect()
             ->route('portal.plans', [
-                'hotspot_return' => $payment->access_point,
+                'hotspot_return' => $payment->access_point !== '' ? $payment->access_point : null,
                 'hotspot_dst' => $payment->hotspot_dst,
                 'phone' => $payment->phone_number,
             ])
@@ -368,5 +393,78 @@ class SubscriptionController extends Controller
         }
 
         return redirect()->away($url);
+    }
+
+    protected function ensureMemberCustomerForPhone(string $phoneNumber): Customer
+    {
+        $customer = Customer::query()
+            ->where('phone_number', $phoneNumber)
+            ->first();
+
+        if ($customer) {
+            $customer->fill([
+                'phone_number' => $phoneNumber,
+                'service_type' => $customer->service_type ?: 'Hotspot',
+                'status' => 'Active',
+            ]);
+            $customer->save();
+
+            return $customer;
+        }
+
+        return Customer::query()->create([
+            'username' => $this->resolveAvailableCustomerUsername($phoneNumber),
+            'full_name' => $phoneNumber,
+            'phone_number' => $phoneNumber,
+            'password' => Hash::make($phoneNumber),
+            'account_type' => 'Personal',
+            'balance' => 0,
+            'service_type' => 'Hotspot',
+            'auto_renewal' => false,
+            'status' => 'Active',
+        ]);
+    }
+
+    protected function signInMemberCustomer(Request $request, Customer $customer): void
+    {
+        $request->session()->regenerate();
+        $request->session()->put('customer_id', $customer->id);
+        $customer->update(['last_login_at' => now()]);
+        Cookie::queue(MemberRemember::cookie($customer, $request->isSecure()));
+    }
+
+    protected function resolveAvailableCustomerUsername(string $baseUsername): string
+    {
+        if (! Customer::query()->where('username', $baseUsername)->exists()) {
+            return $baseUsername;
+        }
+
+        $suffix = 2;
+
+        do {
+            $candidate = $baseUsername.'-'.$suffix;
+            $suffix++;
+        } while (Customer::query()->where('username', $candidate)->exists());
+
+        return $candidate;
+    }
+
+    protected function shouldRedirectToMemberDashboard(string $hotspotReturn): bool
+    {
+        return trim($hotspotReturn) === '';
+    }
+
+    protected function redirectAfterPurchase(
+        Request $request,
+        string $loginUrl,
+        bool $redirectToMemberDashboard
+    ): \Symfony\Component\HttpFoundation\Response|RedirectResponse {
+        if ($redirectToMemberDashboard) {
+            return redirect()
+                ->route('member.dashboard')
+                ->with('success', 'Plan activated. Open Connect Internet when you want to go online.');
+        }
+
+        return $this->redirectToExternal($request, $loginUrl);
     }
 }

@@ -2,9 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
+use App\Models\NetworkRouter;
 use App\Models\Payment;
+use App\Models\Recharge;
+use App\Models\Transaction;
 use App\Models\Voucher;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -49,6 +54,10 @@ class DashboardController extends Controller
         $expectedAmount = Voucher::query()
             ->join('plans', 'vouchers.plan_type', '=', 'plans.plan_type')
             ->sum('plans.amount');
+        $hasCustomersTable = Schema::hasTable('customers');
+        $hasRoutersTable = Schema::hasTable('network_routers');
+        $hasTransactionsTable = Schema::hasTable('transactions');
+        $hasRechargesTable = Schema::hasTable('recharges');
 
         return Inertia::render('Dashboard', [
             'stats' => [
@@ -67,6 +76,12 @@ class DashboardController extends Controller
                 'voucher_totals' => $voucherTotals,
                 'expected_amount' => $expectedAmount,
                 'currency' => 'NGN',
+                'customer_count' => $hasCustomersTable ? Customer::query()->count() : 0,
+                'active_customer_count' => $hasCustomersTable ? Customer::query()->where('status', 'Active')->count() : 0,
+                'router_count' => $hasRoutersTable ? NetworkRouter::query()->count() : 0,
+                'online_router_count' => $hasRoutersTable ? NetworkRouter::query()->where('status', 'Online')->count() : 0,
+                'transaction_count' => $hasTransactionsTable ? Transaction::query()->count() : 0,
+                'recharge_count' => $hasRechargesTable ? Recharge::query()->count() : 0,
             ],
         ]);
     }

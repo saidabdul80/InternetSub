@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Customer;
 use App\Models\MikrotikUser;
 use App\Models\Payment;
 use App\Models\Plan;
@@ -13,6 +14,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -94,8 +96,32 @@ class PaymentController extends Controller
                     $profile,
                     $expiresAt,
                     $mikrotikService,
+                    $request,
                     &$payment
                 ): void {
+                    $customer = Customer::query()->firstOrNew([
+                        'phone_number' => $phoneNumber,
+                    ]);
+
+                    $username = $customer->exists
+                        ? $customer->username
+                        : $this->resolveAvailableCustomerUsername($phoneNumber);
+
+                    $customer->fill([
+                        'username' => $username,
+                        'full_name' => $customer->full_name ?: $phoneNumber,
+                        'email' => $customer->email,
+                        'phone_number' => $phoneNumber,
+                        'password' => Hash::make($phoneNumber),
+                        'account_type' => $customer->account_type ?: 'Personal',
+                        'service_type' => 'Hotspot',
+                        'status' => 'Active',
+                        'balance' => $customer->balance ?? 0,
+                        'auto_renewal' => $customer->auto_renewal ?? false,
+                        'created_by' => $customer->created_by ?: $request->user()?->id,
+                    ]);
+                    $customer->save();
+
                     $payment = Payment::query()->create([
                         'plan_id' => $plan->id,
                         'plan_type' => $plan->plan_type,
@@ -148,7 +174,10 @@ class PaymentController extends Controller
                 return back()->with('error', 'Direct activation failed. Please check MikroTik connectivity and plan mapping.');
             }
 
-            return back()->with('success', 'Phone number activated: '.$phoneNumber);
+            return back()->with(
+                'success',
+                'Phone number activated: '.$phoneNumber.'. Member login: /member/login. Username or phone: '.$phoneNumber.'. Password: '.$phoneNumber
+            );
         }
 
         $payment = null;
@@ -286,5 +315,21 @@ class PaymentController extends Controller
         }
 
         return Carbon::now()->addHours($durationHours);
+    }
+
+    protected function resolveAvailableCustomerUsername(string $baseUsername): string
+    {
+        if (! Customer::query()->where('username', $baseUsername)->exists()) {
+            return $baseUsername;
+        }
+
+        $suffix = 2;
+
+        do {
+            $candidate = $baseUsername.'-'.$suffix;
+            $suffix++;
+        } while (Customer::query()->where('username', $candidate)->exists());
+
+        return $candidate;
     }
 }

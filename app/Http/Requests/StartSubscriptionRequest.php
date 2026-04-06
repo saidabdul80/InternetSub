@@ -18,7 +18,7 @@ class StartSubscriptionRequest extends FormRequest
             'gateway' => ['required', 'string', 'in:paystack,monnify'],
             'phone_number' => ['required', 'string', 'max:20', 'regex:/^\\+?\\d{8,20}$/'],
             'renew' => ['nullable', 'boolean'],
-            'hotspot_return' => ['required', 'string', 'max:2048'],
+            'hotspot_return' => ['nullable', 'string', 'max:2048'],
             'hotspot_dst' => ['nullable', 'string', 'max:2048'],
         ];
     }
@@ -32,7 +32,6 @@ class StartSubscriptionRequest extends FormRequest
             'gateway.in' => 'The selected payment gateway is invalid.',
             'phone_number.required' => 'Please enter your phone number.',
             'phone_number.regex' => 'Please enter a valid phone number.',
-            'hotspot_return.required' => 'The hotspot return URL is required.',
         ];
     }
 }
