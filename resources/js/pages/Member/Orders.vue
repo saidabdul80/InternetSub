@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
+import { Link, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import MemberLayout from '@/layouts/MemberLayout.vue';
 
@@ -42,10 +43,13 @@ const props = defineProps<{
         plan_name: string | null;
         paid_at: string | null;
         created_at: string;
+        can_reverify: boolean;
     }>;
 }>();
 
 const search = ref('');
+const actionForm = useForm({});
+const processingPaymentId = ref<number | null>(null);
 const filteredTransactions = computed(() =>
     props.transactions.filter((transaction) =>
         `${transaction.invoice} ${transaction.plan_name} ${transaction.method} ${transaction.router_name}`.toLowerCase().includes(search.value.toLowerCase()),
@@ -57,6 +61,16 @@ const filteredPayments = computed(() =>
         `${payment.reference} ${payment.plan_name ?? ''} ${payment.gateway ?? ''} ${payment.status}`.toLowerCase().includes(search.value.toLowerCase()),
     ),
 );
+
+const reverifyPayment = (paymentId: number) => {
+    processingPaymentId.value = paymentId;
+    actionForm.post(`/member/orders/payments/${paymentId}/reverify`, {
+        preserveScroll: true,
+        onFinish: () => {
+            processingPaymentId.value = null;
+        },
+    });
+};
 
 const fmt = (value: string | null) => (value ? new Date(value).toLocaleString() : 'Pending');
 const money = (value: string) => `NGN ${Number(value).toFixed(2)}`;
@@ -173,6 +187,7 @@ const amount = (value: number) => `NGN ${(value / 100).toFixed(2)}`;
                                     <th class="px-4 py-3 font-medium">Gateway</th>
                                     <th class="px-4 py-3 font-medium">Status</th>
                                     <th class="px-4 py-3 font-medium">Timestamp</th>
+                                    <th class="px-4 py-3 font-medium">Action</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/10">
@@ -183,9 +198,22 @@ const amount = (value: number) => `NGN ${(value / 100).toFixed(2)}`;
                                     <td class="px-4 py-4 text-slate-300">{{ payment.gateway || 'manual' }}</td>
                                     <td class="px-4 py-4 text-slate-300">{{ payment.status }}</td>
                                     <td class="px-4 py-4 text-slate-400">{{ fmt(payment.paid_at || payment.created_at) }}</td>
+                                    <td class="px-4 py-4 text-slate-400">
+                                        <Button
+                                            v-if="payment.can_reverify"
+                                            type="button"
+                                            size="sm"
+                                            class="bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+                                            :disabled="actionForm.processing"
+                                            @click="reverifyPayment(payment.id)"
+                                        >
+                                            {{ processingPaymentId === payment.id ? 'Reverifying...' : 'Reverify' }}
+                                        </Button>
+                                        <span v-else class="text-xs text-slate-500">No action</span>
+                                    </td>
                                 </tr>
                                 <tr v-if="filteredPayments.length === 0">
-                                    <td colspan="6" class="px-4 py-12 text-center text-slate-400">No payment attempts linked to your phone number.</td>
+                                    <td colspan="7" class="px-4 py-12 text-center text-slate-400">No payment attempts linked to your phone number.</td>
                                 </tr>
                             </tbody>
                         </table>

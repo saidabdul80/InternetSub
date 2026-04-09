@@ -25,7 +25,14 @@ test('subscription plans page renders with hotspot context', function () {
         ->where('plans.0.plan_type', $plan->plan_type));
 });
 
-test('subscription start skips payment when phone has active mikrotik user', function () {
+test('subscription start initializes payment even when phone has active mikrotik user', function () {
+    config([
+        'services.paystack.secret_key' => 'test-secret',
+        'services.paystack.base_url' => 'https://api.paystack.co',
+        'services.paystack.default_email' => 'guest@example.com',
+        'services.paystack.channels' => ['card', 'bank', 'ussd', 'bank_transfer', 'qr'],
+    ]);
+
     Plan::factory()->create([
         'plan_type' => 2,
         'name' => '24 Hours Unlimited Access',
@@ -44,6 +51,16 @@ test('subscription start skips payment when phone has active mikrotik user', fun
         'last_synced_at' => now(),
     ]);
 
+    Http::fake([
+        'https://api.paystack.co/transaction/initialize' => Http::response([
+            'status' => true,
+            'data' => [
+                'authorization_url' => 'https://paystack.test/authorize-active-user',
+                'reference' => 'ps_ref_active_user_123',
+            ],
+        ]),
+    ]);
+
     $response = $this->post('/app/start', [
         'plan_type' => 2,
         'gateway' => 'paystack',
@@ -52,15 +69,18 @@ test('subscription start skips payment when phone has active mikrotik user', fun
         'hotspot_dst' => 'https://example.com',
     ]);
 
-    $response->assertRedirect();
+    $response->assertRedirect('https://paystack.test/authorize-active-user');
 
-    $location = (string) $response->headers->get('Location');
+    Http::assertSent(function ($request): bool {
+        return $request->url() === 'https://api.paystack.co/transaction/initialize'
+            && data_get($request->data(), 'metadata.phone_number') === '08012345678';
+    });
 
-    expect($location)->toContain('https://hotspot.test/login')
-        ->and($location)->toContain('autologin=1')
-        ->and($location)->toContain('username=08012345678');
+    $payment = Payment::query()->latest('id')->first();
 
-    expect(Payment::query()->count())->toBe(0);
+    expect($payment)->not->toBeNull()
+        ->and($payment?->status)->toBe('pending')
+        ->and($payment?->phone_number)->toBe('08012345678');
 });
 
 test('subscription start allows renewal payment when phone has active mikrotik user', function () {

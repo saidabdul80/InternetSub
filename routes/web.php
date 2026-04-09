@@ -79,6 +79,7 @@ Route::prefix('member')
             Route::get('profile', [MemberProfileController::class, 'edit'])->name('profile.edit');
             Route::put('profile', [MemberProfileController::class, 'update'])->name('profile.update');
             Route::get('orders', [MemberOrderController::class, 'index'])->name('orders.index');
+            Route::post('orders/payments/{payment}/reverify', [MemberOrderController::class, 'reverify'])->name('payments.reverify');
         });
     });
 

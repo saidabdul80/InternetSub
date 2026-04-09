@@ -6,6 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\Plan;
+use App\Services\GatewayFactory;
+use App\Services\HotspotPaymentFulfillmentService;
+use App\Services\MikrotikService;
+use Illuminate\Http\RedirectResponse;
+use RuntimeException;
+use Throwable;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -47,6 +53,7 @@ class OrderController extends Controller
                     'plan_name' => $payment->plan?->name,
                     'paid_at' => $payment->paid_at,
                     'created_at' => $payment->created_at,
+                    'can_reverify' => $payment->status === 'pending' && ($payment->gateway ?: 'paystack') !== 'manual',
                 ]);
         }
 
@@ -66,5 +73,79 @@ class OrderController extends Controller
             'transactions' => $transactions,
             'payments' => $payments,
         ]);
+    }
+
+    public function reverify(
+        Payment $payment,
+        GatewayFactory $gatewayFactory,
+        MikrotikService $mikrotikService,
+        HotspotPaymentFulfillmentService $paymentFulfillmentService
+    ): RedirectResponse {
+        /** @var Customer $customer */
+        $customer = request()->attributes->get('customer');
+
+        if (! $this->paymentBelongsToCustomer($payment, $customer)) {
+            abort(404);
+        }
+
+        if ($payment->status === 'fulfilled') {
+            return back()->with('success', 'This payment has already been activated.');
+        }
+
+        $gateway = $payment->gateway ?: 'paystack';
+        if ($gateway === 'manual') {
+            return back()->with('error', 'Manual payments cannot be reverified.');
+        }
+
+        $reference = $payment->paystack_reference ?? $payment->reference;
+        $gatewayClient = $gatewayFactory->create($gateway);
+
+        try {
+            $verification = $gatewayClient->verifyTransaction($reference);
+        } catch (RuntimeException $exception) {
+            report($exception);
+
+            return back()->with('error', 'Unable to verify payment with the selected gateway.');
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'Unable to verify payment right now. Please try again.');
+        }
+
+        if (data_get($verification, 'status') !== 'success') {
+            return back()->with('error', 'Payment is still pending on the selected gateway.');
+        }
+
+        try {
+            $paymentFulfillmentService->finalizePaymentAndCreateHotspotUser($payment, $mikrotikService);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'Payment was successful but activation failed. Please contact support.');
+        }
+
+        return back()->with('success', 'Payment verified and plan activated. You can now connect to the internet.');
+    }
+
+    protected function paymentBelongsToCustomer(Payment $payment, Customer $customer): bool
+    {
+        $customerPhone = $customer->phone_number ?: $customer->username;
+
+        return $this->normalizeNigerianPhone((string) $payment->phone_number) === $this->normalizeNigerianPhone((string) $customerPhone);
+    }
+
+    protected function normalizeNigerianPhone(string $phone): string
+    {
+        $normalized = preg_replace('/\D+/', '', $phone) ?? '';
+
+        if (str_starts_with($normalized, '234')) {
+            $normalized = substr($normalized, 3);
+        }
+
+        if ($normalized !== '' && ! str_starts_with($normalized, '0')) {
+            $normalized = '0'.$normalized;
+        }
+
+        return $normalized;
     }
 }
