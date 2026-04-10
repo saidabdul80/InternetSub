@@ -74,12 +74,18 @@ class HotspotPaymentFulfillmentService
     protected function ensureMemberCustomerForPhone(string $phoneNumber): Customer
     {
         $customer = Customer::query()
-            ->where('phone_number', $phoneNumber)
+            ->where(function ($query) use ($phoneNumber): void {
+                $query->whereIn('phone_number', $this->phoneLookupVariants($phoneNumber))
+                    ->orWhere('username', $phoneNumber);
+            })
+            ->orderByRaw('CASE WHEN phone_number = ? THEN 0 ELSE 1 END', [$phoneNumber])
             ->first();
 
         if ($customer) {
             $customer->fill([
+                'username' => $phoneNumber,
                 'phone_number' => $phoneNumber,
+                'password' => Hash::make($phoneNumber),
                 'service_type' => $customer->service_type ?: 'Hotspot',
                 'status' => 'Active',
             ]);
@@ -130,6 +136,33 @@ class HotspotPaymentFulfillmentService
         }
 
         return $normalized;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function phoneLookupVariants(string $value): array
+    {
+        $digits = preg_replace('/\D+/', '', $value) ?? '';
+
+        if ($digits === '' || strlen($digits) < 8) {
+            return [$value];
+        }
+
+        $variants = [$value, $digits];
+
+        if (str_starts_with($digits, '234')) {
+            $local = substr($digits, 3);
+            $variants[] = $local;
+            $variants[] = '0'.$local;
+            $variants[] = '+'.$digits;
+        } elseif (str_starts_with($digits, '0')) {
+            $withoutZero = substr($digits, 1);
+            $variants[] = '234'.$withoutZero;
+            $variants[] = '+234'.$withoutZero;
+        }
+
+        return array_values(array_unique(array_filter($variants)));
     }
 
     protected function calculatePlanExpiry(int $planType): ?Carbon

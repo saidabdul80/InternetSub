@@ -96,14 +96,37 @@ class DashboardController extends Controller
         /** @var Customer $customer */
         $customer = request()->attributes->get('customer');
 
-        $phoneNumber = $customer->phone_number ?: $customer->username;
+        $phoneNumber = $this->normalizeNigerianPhone((string) ($customer->phone_number ?: $customer->username));
+        $latestHotspotPayment = Payment::query()
+            ->where('phone_number', $phoneNumber)
+            ->where('status', 'fulfilled')
+            ->where('access_point', '!=', '')
+            ->latest('paid_at')
+            ->latest('id')
+            ->first();
+
         $loginUrl = HotspotLoginUrl::build(
-            (string) config('services.mikrotik.login_url'),
-            '',
+            (string) ($latestHotspotPayment?->access_point ?: config('services.mikrotik.login_url')),
+            (string) ($latestHotspotPayment?->hotspot_dst ?? ''),
             $phoneNumber,
             $phoneNumber
         );
 
         return redirect()->away($loginUrl);
+    }
+
+    protected function normalizeNigerianPhone(string $phone): string
+    {
+        $normalized = preg_replace('/\D+/', '', $phone) ?? '';
+
+        if (str_starts_with($normalized, '234')) {
+            $normalized = substr($normalized, 3);
+        }
+
+        if ($normalized !== '' && ! str_starts_with($normalized, '0')) {
+            $normalized = '0'.$normalized;
+        }
+
+        return $normalized;
     }
 }
