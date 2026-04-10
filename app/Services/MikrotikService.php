@@ -139,13 +139,13 @@ class MikrotikService
                 if ($comment !== null && $comment !== '') {
                     $attributes[] = '=comment='.$comment;
                 }
-
-                $this->command('/ip/hotspot/user/set', $attributes);
                 $this->command('/ip/hotspot/user/reset-counters', [
                     '=.id='.$userId,
                 ]);
                 $this->removeHotspotActiveSessions($username);
                 $this->removeHotspotCookies($username);
+
+                $this->command('/ip/hotspot/user/set', $attributes);
 
                 return;
             }
